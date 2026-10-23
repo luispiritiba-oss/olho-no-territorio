@@ -184,6 +184,7 @@ const LAYERS=[
 const on=id=>LAYERS.find(l=>l.id===id).on;
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 function resize(){DPR=Math.min(2,window.devicePixelRatio||1);const r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);fitAspect();draw();}
+function clampView(){const cx=(view.w+view.e)/2,cy=(view.s+view.n)/2;const nx=Math.max(-46.7,Math.min(-37.3,cx)),ny=Math.max(-18.4,Math.min(-8.5,cy));const dx=nx-cx,dy=ny-cy;view.w+=dx;view.e+=dx;view.s+=dy;view.n+=dy;}
 function fitAspect(){const cx=(view.w+view.e)/2,cy=(view.s+view.n)/2;KX=KXf(cy);let gw=(view.e-view.w)*KX,gh=(view.n-view.s)*KY;const ar=W/H;if(gw/gh>ar)gh=gw/ar;else gw=gh*ar;view={w:cx-gw/2/KX,e:cx+gw/2/KX,s:cy-gh/2/KY,n:cy+gh/2/KY};}
 const px=x=>(x-view.w)/(view.e-view.w)*W, py=y=>(view.n-y)/(view.n-view.s)*H;
 const gx=X=>view.w+X/W*(view.e-view.w), gy=Y=>view.n-Y/H*(view.n-view.s);
@@ -224,6 +225,10 @@ function drawNow(c,opts){
   if(on("ter")){for(const t of [...TERRS,...(curT&&!curT.saved?[curT]:[])]){pathRings(c,t.rings);c.fillStyle="rgba(216,27,96,.12)";c.fill("evenodd");c.strokeStyle="#d81b60";c.lineWidth=t===curT?3.2:2.2;c.stroke();}
     for(const r of REGS){if(!(r.lon>=view.w&&r.lon<=view.e&&r.lat>=view.s&&r.lat<=view.n))continue;const X=px(r.lon),Y=py(r.lat);c.beginPath();c.moveTo(X,Y);c.arc(X,Y-11,6,Math.PI*0.8,Math.PI*2.2);c.closePath();c.fillStyle="#d81b60";c.fill();c.strokeStyle="#fff";c.lineWidth=1.5;c.stroke();}}
   if(drawPts){c.beginPath();drawPts.forEach(([x,y],i)=>i?c.lineTo(px(x),py(y)):c.moveTo(px(x),py(y)));if(drawPts.length>2)c.closePath();c.strokeStyle="#d81b60";c.lineWidth=2.5;c.stroke();if(drawPts.length>2){c.fillStyle="rgba(216,27,96,.15)";c.fill();}drawPts.forEach(([x,y])=>{c.beginPath();c.arc(px(x),py(y),5,0,7);c.fillStyle="#d81b60";c.fill();c.strokeStyle="#fff";c.lineWidth=2;c.stroke();});}
+  if(CARLIST&&on("car")){c.strokeStyle="#5b6f8c";c.lineWidth=1;for(const k of CARLIST.list){if(!vis(k.bb))continue;pathRings(c,k.r);c.stroke();}}
+  /* máscara: só a Bahia fica visível */
+  if(!opts.noMask){c.save();c.beginPath();c.rect(-10,-10,W+20,H+20);for(const r of UF){for(let i=0;i<r.length;i++){const X=px(r[i][0]),Y=py(r[i][1]);i?c.lineTo(X,Y):c.moveTo(X,Y);}c.closePath();}
+    c.fillStyle=opts.mask||css("--mapmask");c.fill("evenodd");c.restore();c.strokeStyle=ink;c.lineWidth=2;pathRings(c,UF);c.stroke();}
   if(on("mu")&&!opts.noLabels&&vw()<1.6){c.font="600 12px "+css("--f-body");c.textAlign="center";c.fillStyle=ink;c.globalAlpha=.75;
     for(const m of MUN){if(!vis(m.bb))continue;const cx=Math.max(view.w,Math.min(view.e,(m.bb.w+m.bb.e)/2)),cy=Math.max(view.s,Math.min(view.n,(m.bb.s+m.bb.n)/2));if(inPoly(cx,cy,m.r))c.fillText(m.name,px(cx),py(cy));}c.globalAlpha=1;}
   if(sel&&!opts.noSel){const X=px(sel.x),Y=py(sel.y);const rp=sel.R/KXf(sel.y)/(view.e-view.w)*W;c.beginPath();c.arc(X,Y,rp,0,7);c.strokeStyle=css("--accent");c.lineWidth=2;c.setLineDash([5,4]);c.stroke();c.setLineDash([]);c.fillStyle=css("--accent")+"14";c.fill();
@@ -239,13 +244,14 @@ cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId);ptrs.set
 cv.addEventListener("pointermove",e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,{x:e.offsetX,y:e.offsetY});
   if(ptrs.size===2&&pinch0){const [a,b]=[...ptrs.values()];const k=pinch0.d/Math.max(10,Math.hypot(a.x-b.x,a.y-b.y));view=Object.assign({},pinch0.v);zoomAt(pinch0.cx,pinch0.cy,k);moved=99;draw();return;}
   const dx=e.offsetX-last.x,dy=e.offsetY-last.y;moved+=Math.abs(dx)+Math.abs(dy);last={x:e.offsetX,y:e.offsetY};
-  if(moved>6){const sx=(view.e-view.w)/W,sy=(view.n-view.s)/H;view.w-=dx*sx;view.e-=dx*sx;view.n+=dy*sy;view.s+=dy*sy;draw();}});
+  if(moved>6){const sx=(view.e-view.w)/W,sy=(view.n-view.s)/H;view.w-=dx*sx;view.e-=dx*sx;view.n+=dy*sy;view.s+=dy*sy;clampView();draw();}});
 cv.addEventListener("pointerup",e=>{const wasTap=ptrs.size===1&&moved<=6;ptrs.delete(e.pointerId);if(ptrs.size<2)pinch0=null;if(!wasTap||!B)return;const x=gx(e.offsetX),y=gy(e.offsetY);
   if(drawPts){drawPts.push([x,y]);updDraw();draw();return;}
+  if(!inBahia(x,y)){say("Este ponto fica fora da Bahia. Toque dentro do mapa do estado.",true);return;}
   choose(x,y,"mapa");});
 cv.addEventListener("pointercancel",e=>{ptrs.delete(e.pointerId);pinch0=null;});
 cv.addEventListener("wheel",e=>{e.preventDefault();zoomAt(e.offsetX,e.offsetY,e.deltaY>0?1.25:0.8);draw();},{passive:false});
-function zoomAt(X,Y,k){const x=gx(X),y=gy(Y);const nw=(view.e-view.w)*k;if(nw<0.004||nw>14)return;const nh=(view.n-view.s)*k;view={w:x-(X/W)*nw,e:x+(1-X/W)*nw,n:y+(Y/H)*nh,s:y-(1-Y/H)*nh};}
+function zoomAt(X,Y,k){const x=gx(X),y=gy(Y);const nw=(view.e-view.w)*k;if(nw<0.004||nw>12)return;const nh=(view.n-view.s)*k;view={w:x-(X/W)*nw,e:x+(1-X/W)*nw,n:y+(Y/H)*nh,s:y-(1-Y/H)*nh};clampView();}
 $("zin").onclick=()=>{zoomAt(W/2,H/2,0.6);draw();};
 $("zout").onclick=()=>{zoomAt(W/2,H/2,1.6);draw();};
 $("zall").onclick=()=>{view=Object.assign({},VIEW_BA);fitAspect();draw();};
@@ -295,6 +301,7 @@ function parseLoc(raw){
 function goLoc(text,how){const c=parseLoc(text);if(!c){say("Não entendi a localização. Exemplos: -10.54, -40.40 · 10°32'S 40°24'W · 24L 353989 8819640 · link do Google Maps.",true);return false;}
   if(c.err){say(c.err,true);return false;}
   if(c.lat<-19.5||c.lat>-7.5||c.lon<-47.5||c.lon>-37){say(`O ponto ${c.lat.toFixed(4)}, ${c.lon.toFixed(4)} fica fora da Bahia. Confira se latitude e longitude estão na ordem certa.`,true);return false;}
+  if(B&&!inBahia(c.lon,c.lat)){say(`O ponto ${c.lat.toFixed(4)}, ${c.lon.toFixed(4)} fica fora do território da Bahia. O aplicativo só mostra dados do estado.`,true);return false;}
   centerOn(c.lon,c.lat,0.25);choose(c.lon,c.lat,how);return true;}
 $("go").onclick=()=>goLoc(coord.value,"coordenadas");
 coord.addEventListener("keydown",e=>{if(e.key==="Enter")$("go").click();});
@@ -328,7 +335,7 @@ $("mun").addEventListener("change",()=>{const v=$("mun").value.trim().toLowerCas
   const bb=m.reduce((a,x)=>({w:Math.min(a.w,x.bb.w),e:Math.max(a.e,x.bb.e),s:Math.min(a.s,x.bb.s),n:Math.max(a.n,x.bb.n)}),{w:1e9,e:-1e9,s:1e9,n:-1e9});fitTo(bb,0.05);draw();say(`Mapa centralizado em ${m[0].name}. Toque no mapa para consultar um ponto.`);});
 
 /* ---------- report ---------- */
-let busy=0,gpsAcc=null;
+let busy=0,gpsAcc=null,CARLIST=null;
 async function choose(x,y,how,keepView){
   sel={x,y,R,how,acc:how==="GPS"?gpsAcc:null}; coord.value=y.toFixed(5)+", "+x.toFixed(5);
   if(!keepView&&!(x>view.w&&x<view.e&&y>view.s&&y<view.n)){centerOn(x,y,Math.min(vw(),0.6));}
@@ -353,6 +360,8 @@ function summary(a){const S=[];
   S.push({k:tIn.length?"in":(tN.length?"near":"none"),b:tIn.length||tN.length,t:tIn.length?"área protegida ou território no ponto":(tN.length?"área protegida ou território no raio":"sem área protegida ou território no raio")});
   if(a.car.at!=null)S.push({k:a.car.at?"near":"none",b:a.car.at?"Sim":"Não",t:a.car.at?"há imóvel do CAR declarado no ponto":"nenhum imóvel do CAR declarado no ponto"});
   return S;}
+function styleBlocks(root){root.querySelectorAll("section.blk").forEach(sec=>{const h=sec.querySelector("h3");const t=h?h.textContent:"";
+  sec.classList.add(/Minera/.test(t)?"k-min":/Energia/.test(t)?"k-en":/protegidas|povos/.test(t)?"k-ter":/CAR/.test(t)?"k-car":/Uso e cobertura/.test(t)?"k-lu":"k-act");});}
 function render(a){
   const out=$("out"), d=a.when.toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   let h=`<div class="rep"><div class="head"><h2>Resultado da consulta</h2>
@@ -367,7 +376,7 @@ function render(a){
     <p style="margin:0;color:var(--mute);font-size:14px">Substâncias mais pedidas no raio: ${a.minSubs.slice(0,5).map(([s,n])=>esc(String(s).toLowerCase())+" ("+n+")").join(", ")}.</p>`;
     const list=[...a.minIn,...a.minNear.slice(0,Math.max(0,6-a.minIn.length))];
     h+=list.map(m=>`<div class="item">${tag(m.d)}<div><p class="what">${esc(m.subs.charAt(0)+m.subs.slice(1).toLowerCase())} · ${esc(m.fase.toLowerCase())}</p><p class="meta">Uso: ${esc(m.uso)} · Titular: ${esc(titular(m.nome))} · Processo ${esc(m.proc)} · ${fmtN(m.area)} ha</p><p class="plain">${esc((FASE[m.fase]||{}).txt||"")}</p></div></div>`).join("");
-    if(all.length>list.length)h+=`<p class="empty">E mais ${all.length-list.length} processo${all.length-list.length>1?"s":""} no raio (todos no PDF).</p>`;}
+    if(all.length>list.length)h+=`<p class="empty">E mais ${all.length-list.length} processo${all.length-list.length>1?"s":""} no raio.</p>`;h+=minTableHTML(all);}
   h+=`</section>`;
   // energy
   h+=`<section class="blk"><h3>Energia</h3>`;
@@ -384,21 +393,27 @@ function render(a){
   h+=`<p class="empty">${a.sa.length?`${a.sa.length} sítio${a.sa.length>1?"s":""} arqueológico${a.sa.length>1?"s":""} no raio. O mais próximo: ${esc(a.sa[0].name)}, a ${fmtKm(a.sa[0].d)}.`:"Nenhum sítio arqueológico cadastrado no raio."}</p></section>`;
   h+=carSection(a);
   // land use
-  h+=`<section class="blk"><h3>Uso e cobertura da terra</h3>`;
+  h+=`<section class="blk"><h3>Uso e cobertura da terra</h3><div id="lus"><div class="loading" style="padding:8px 0"><span class="spin"></span>Calculando a série histórica 1985–2025…</div></div>`;
   if(a.lu.tot){if(a.luAt!=null&&a.luAt<250)h+=`<p style="margin:0">No ponto: <strong>${esc(luName(LEG[a.luAt][0]))}</strong></p>`;
-    h+=`<div class="bars">${a.lu.cls.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">MapBiomas 2024, células de cerca de 220 m. Na Caatinga, a formação savânica é a vegetação nativa de porte arbustivo e arbóreo.</p>`;}
+    h+=`<div class="bars">${a.lu.cls.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">Composição em 2025 (MapBiomas Coleção 11, células de cerca de 220 m). Na Caatinga, a formação savânica é a vegetação nativa de porte arbustivo e arbóreo.</p>`;}
   else h+=`<p class="empty">Sem dados do MapBiomas para este local.</p>`;
   h+=`</section>`;
   h+=`<section class="blk"><div class="row"><button type="button" class="btn primary" id="pdf">Baixar relatório em PDF</button><button type="button" class="btn" id="reg2">Registrar observação aqui</button><button type="button" class="btn" id="csave">Guardar esta consulta</button></div><p class="msg" id="pdfmsg" role="status"></p></section>`;
   h+=`<section class="blk"><details><summary>Fontes e datas dos dados</summary><ul class="src">${SOURCES.map(s=>`<li>${s}</li>`).join("")}</ul></details></section></div>`;
-  out.innerHTML=h;
+  out.innerHTML=h;styleBlocks(out);
   $("pdf").onclick=()=>makePDF(a);$("csave").onclick=()=>saveConsulta(a);
   $("reg2").onclick=()=>{$("regPanel").scrollIntoView({behavior:"smooth",block:"start"});const t=$("rtexto");if(t)t.focus();};
   out.querySelectorAll("[data-usepct]").forEach(b=>b.onclick=()=>useCarPct(CARC.find(c=>c.cod===b.dataset.usepct)));
+  const my=busy;
+  a.seriesP=seriesCircle(a.x,a.y,a.R).catch(()=>null).then(S=>{a.series=S;if(my!==busy||!$("lus"))return S;$("lus").innerHTML=seriesBlock(S,"chartPt");wireChart("chartPt",S);return S;});
+  CARLIST=null;
+  if(navigator.onLine){a.carP=carList(a.x,a.y,a.R).then(L=>{a.carL=L;if(my!==busy||!$("carfull"))return L;CARLIST=L;$("carfull").innerHTML=carListHTML(L);draw();return L;})
+     .catch(e=>{if(my===busy&&$("carfull"))$("carfull").innerHTML=`<p class="warnbox">Não foi possível buscar a lista completa no SICAR agora (${esc(e.message||"sem resposta")}). Tente de novo mais tarde.</p>`;return null;});}
+  else{a.carP=Promise.resolve(null);if($("carfull"))$("carfull").innerHTML=`<p class="warnbox">Sem internet: a lista completa do CAR é consultada no SICAR na hora. Abaixo estão os cadastros coletivos e os grandes imóveis guardados no celular.</p>`;}
 }
 function carSection(a){const C=a.car;let h=`<section class="blk"><h3>CAR / CEFIR</h3>`;
   if(C.at==null&&C.p1==null)return h+`<p class="empty">Sem dados do CAR para este local.</p></section>`;
-  h+=`<p style="margin:0">${C.at?"Há imóvel rural do CAR declarado sobre este ponto.":"Nenhum imóvel rural do CAR declarado sobre este ponto."}</p>`;
+  h+=`<p style="margin:0">${C.at?"Há imóvel rural do CAR declarado sobre este ponto.":"Nenhum imóvel rural do CAR declarado sobre este ponto."}</p><div id="carfull"><div class="loading" style="padding:8px 0"><span class="spin"></span>Buscando todos os cadastros do raio no SICAR…</div></div>`;
   if(C.p1!=null)h+=`<div class="bars"><div class="bar"><span>Área do raio com CAR</span><div class="track"><div class="fill" style="width:${C.p1}%;background:#7f95b3"></div></div><span class="v">${pf(C.p1)}</span></div></div>`;
   C.coll.forEach(c=>{h+=`<div class="item">${tag(c.d)}<div><p class="what">${c.tipo==="PCT"?"CEFIR coletivo de comunidade tradicional":"Assentamento no CAR"} · ${esc(c.mun)} · ${fmtN(c.area,1)} ha</p>
     <p class="meta">${esc(c.cod)} · ${c.st==="CA"?"cancelado":esc((c.cond||"").toLowerCase())} · cadastrado em ${esc((c.criado||"").split("-").reverse().join("/"))}</p>
@@ -412,8 +427,8 @@ const SOURCES=[
   "Mineração: ANM, SIGMINE (processos minerários ativos na Bahia), consultado em 23/10/2026.",
   "Unidades de conservação, terras indígenas, territórios quilombolas, assentamentos, sítios arqueológicos e limites: camadas de referência do SIGMINE (ANM), com origem em CNUC/MMA, FUNAI, INCRA, IPHAN e IBGE. Consultado em 23/10/2026.",
   "Energia: EPE (Webmap EPE: parques eólicos, usinas solares, linhas e subestações existentes e planejadas; projetos não operacionais 2025) e cadastro ANEEL/SIGA.",
-  "Uso e cobertura da terra: MapBiomas Coleção 10, ano 2024, via serviço da EPE.",
-  "CAR/CEFIR: SICAR (Serviço Florestal Brasileiro), camada pública da Bahia, que recebe os cadastros do CEFIR/INEMA, incluindo os coletivos de povos e comunidades tradicionais. Grandes imóveis: mais de 15 módulos fiscais. Consultado em 23/10/2026."
+  "Uso e cobertura da terra: MapBiomas Coleção 11 (mapas anuais de 1985 a 2025, resolução original de 30 m), lidos da Plataforma MapBiomas em 23/10/2026. A série histórica usa uma grade de cerca de 550 m e o mapa de 2025 uma grade de cerca de 220 m.",
+  "CAR/CEFIR: SICAR (Serviço Florestal Brasileiro), camada pública da Bahia, que recebe os cadastros do CEFIR/INEMA, incluindo os coletivos de povos e comunidades tradicionais. A lista completa do raio é consultada no SICAR no momento da consulta; sem internet, o aplicativo usa a cópia de 23/10/2026 dos coletivos e grandes imóveis (mais de 15 módulos fiscais)."
 ];
 $("foot").textContent="Versão de teste em campo. Os dados vêm de bases públicas oficiais e podem estar desatualizados ou incompletos. Estar perto de um processo ou projeto não significa que haverá obra ou mina: cada etapa explica o que já foi autorizado. Nomes de pessoas físicas são ocultados. Os dados pessoais, registros e territórios são enviados para uma pasta restrita da equipe no Google Drive; enquanto não há internet, ficam guardados neste celular. A leitura do relatório em áudio será incluída na fase final.";
 
@@ -421,15 +436,22 @@ $("foot").textContent="Versão de teste em campo. Os dados vêm de bases públic
 function snapshot(bb,selPt){const S=900,off=document.createElement("canvas");off.width=S;off.height=S;const c=off.getContext("2d");const keep={view,W,H,sel};W=S;H=S;
   const cx=(bb.w+bb.e)/2,cy=(bb.s+bb.n)/2,kx=KXf(cy),span=Math.max((bb.e-bb.w)*kx,(bb.n-bb.s)*KY);view={w:cx-span/2/kx,e:cx+span/2/kx,s:cy-span/2/KY,n:cy+span/2/KY};
   if(!selPt)sel=null;drawNow(c,{scale:1,bg:"#eef0e8",ink:"#1b211e",noLoad:true,noSel:!selPt});view=keep.view;W=keep.W;H=keep.H;sel=keep.sel;return off.toDataURL("image/jpeg",0.85);}
+let BANNER=null;fetch("icons/campanha.jpg").then(r=>r.ok?r.blob():null).then(b=>{if(!b)return;const fr=new FileReader();fr.onload=()=>{BANNER=fr.result;};fr.readAsDataURL(b);}).catch(()=>{});
 function pdfDoc(){const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const M=16,PW=210-2*M;const st={y:18};
+  if(BANNER){try{const w=52,h=w*463/554;doc.addImage(BANNER,"JPEG",(210-w)/2,8,w,h);st.y=8+h+8;}catch(e){}}
   const need=h=>{if(st.y+h>282){doc.addPage();st.y=18;}};
   const T=(s,sz=10,f="normal",col=[27,33,30])=>{doc.setFont("helvetica",f);doc.setFontSize(sz);doc.setTextColor(...col);const L=doc.splitTextToSize(String(s),PW);need(L.length*sz*0.42+1);doc.text(L,M,st.y);st.y+=L.length*sz*0.42+1.5;};
   const H2=s=>{st.y+=3;need(12);doc.setDrawColor(200);doc.line(M,st.y-2,M+PW,st.y-2);T(s,13,"bold",[13,106,82]);};
   const IMG=(img,cap)=>{need(PW*0.62+8);doc.addImage(img,"JPEG",M+PW*0.19,st.y,PW*0.62,PW*0.62);st.y+=PW*0.62+2;T(cap,8,"normal",[90,99,93]);};
   const FIN=(name)=>{const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(120);doc.text(`Olho no Território · versão de teste · página ${i} de ${n}`,M,290);}return doc.output("blob");};
-  return {doc,T,H2,IMG,FIN};}
-function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
-  const {T,H2,IMG,FIN}=pdfDoc();const P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
+  const IMG2=(img,cap)=>{const h=PW*0.4;need(h+8);doc.addImage(img,"PNG",M,st.y,PW,h);st.y+=h+2;T(cap,8,"normal",[90,99,93]);};
+  const TABLE=(head,body,o={})=>{if(!doc.autoTable){T("(tabela indisponível: o gerador de tabelas não carregou)",8);return;}const cs={};Object.entries(o.colW||{}).forEach(([k,v])=>cs[k]={cellWidth:v});
+    doc.autoTable({startY:st.y,head:[head],body,margin:{left:M,right:M,top:16,bottom:14},styles:{fontSize:o.fontSize||7.5,cellPadding:1,overflow:"linebreak",lineColor:[211,216,205],lineWidth:0.1},headStyles:{fillColor:[13,106,82],textColor:255,fontStyle:"bold"},alternateRowStyles:{fillColor:[244,246,241]},columnStyles:cs});st.y=doc.lastAutoTable.finalY+4;};
+  return {doc,T,H2,IMG,IMG2,TABLE,FIN};}
+async function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
+  pm.textContent="Juntando a série histórica e a lista do CAR…";const wait=(p,ms)=>Promise.race([p||Promise.resolve(null),new Promise(r=>setTimeout(()=>r(null),ms))]);
+  const S=await wait(a.seriesP,20000),CL=await wait(a.carP,40000);
+  const {T,H2,IMG,IMG2,TABLE,FIN}=pdfDoc();const P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
   T("Olho no Território",20,"bold");T("Relatório de consulta por ponto · Bahia",10,"normal",[90,99,93]);
   T(`Coordenadas: ${a.y.toFixed(5)}, ${a.x.toFixed(5)}`,11,"bold");
   T(`${a.mun?"Município: "+a.mun+" (BA)":"Município não identificado"}   Raio: ${a.R} km   Data: ${a.when.toLocaleString("pt-BR")}   Origem do ponto: ${sel&&sel.how||""}`,10);
@@ -437,7 +459,8 @@ function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent="Não 
   H2("Resumo");summary(a).forEach(s=>T(`• ${s.b} ${s.t}`,10.5));
   H2("Mineração (ANM/SIGMINE)");const all=[...a.minIn,...a.minNear];
   if(!all.length)T(`Nenhum processo minerário a até ${a.R} km.`);else{T("Processos por etapa: "+Object.entries(STAGE).filter(([k])=>a.minStage[k]).map(([k,v])=>`${v.n}: ${a.minStage[k]}`).join("; ")+".");
-    all.forEach(m=>{T(`${m.d===0?"NO PONTO":"a "+fmtKm(m.d)} | ${m.subs} | ${m.fase}`,10,"bold");T(`Uso: ${m.uso}. Titular: ${titular(m.nome)}. Processo ${m.proc}. Área: ${fmtN(m.area)} ha. Último evento: ${m.ev}.`,9);T(`O que significa: ${(FASE[m.fase]||{}).txt||""}`,9,"italic",[70,78,72]);});}
+    T("Lista completa dos processos no raio, com os mesmos campos do SIGMINE:",9.5);minTablePDF(TABLE,all,false);
+    T("O que significa cada fase:",9.5,"bold");[...new Set(all.map(m=>m.fase))].forEach(f=>T(`• ${f}: ${(FASE[f]||{}).txt||""}`,8.5));}
   H2("Energia (EPE/ANEEL)");if(a.enR.length)a.enR.forEach(e=>T(`${e.d===0?"NO PONTO":"a "+fmtKm(e.d)} | ${e.tipo==="UFV"?"Solar":"Eólica"} ${e.name}${e.mw?" | "+fmtN(e.mw,1)+" MW":""} | ${e.fase}: ${enTxt(e.fase)}`,9.5));
   else T(`Nenhum parque eólico ou usina solar a até ${a.R} km.${a.enNearest?` Mais próximo: ${a.enNearest.name}, a ${fmtKm(a.enNearest.d)}.`:""}`);
   if(a.lte)T(`Linha de transmissão existente mais próxima: ${a.lte.name}, a ${fmtKm(a.lte.d)}.`,9.5);
@@ -448,9 +471,11 @@ function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent="Não 
   H2("CAR / CEFIR (SICAR)");T(a.car.at?"Há imóvel rural do CAR declarado sobre o ponto.":"Nenhum imóvel rural do CAR declarado sobre o ponto.",10,"bold");
   if(a.car.p1!=null)T(`${P(a.car.p1)} da área do raio tem imóvel rural do CAR declarado.`,9.5);
   a.car.coll.forEach(c=>T(`${c.d===0?"NO PONTO":"a "+fmtKm(c.d)} | ${c.tipo==="PCT"?"CEFIR coletivo (PCT)":"Assentamento no CAR"} | ${c.mun} | ${fmtN(c.area,1)} ha | ${c.cod} | ${c.st==="CA"?"cancelado":c.cond}${c.ovPct!=null?` | ${P(c.ovPct)} da área também declarada como imóvel individual`:""}`,9));
-  a.car.big.forEach(b=>T(`${b.d===0?"NO PONTO":"a "+fmtKm(b.d)} | Grande imóvel | ${fmtN(b.area)} ha (${b.mf} MF) | ${b.cod} | ${b.mun}`,9));
+  if(CL&&CL.list.length){T(`Lista completa: ${fmtN(CL.list.length)} cadastros do CAR encostam no raio (consulta ao SICAR em ${CL.when.toLocaleString("pt-BR")}).${CL.trunc?` O raio tem ${fmtN(CL.matched)} cadastros; a lista traz os primeiros ${fmtN(CL.list.length)}.`:""}`,9.5);carTablePDF(TABLE,CL);}
+  else{T("A lista completa do CAR não pôde ser consultada (sem internet ou SICAR fora do ar). Cadastros coletivos e grandes imóveis guardados no aplicativo:",9);a.car.big.forEach(b=>T(`${b.d===0?"NO PONTO":"a "+fmtKm(b.d)} | Grande imóvel | ${fmtN(b.area)} ha (${b.mf} MF) | ${b.cod} | ${b.mun}`,9));}
   T("O CAR é autodeclarado e a maioria dos cadastros aguarda análise do INEMA. Confirme cada caso com a comunidade.",8.5,"italic",[70,78,72]);
-  H2("Uso e cobertura da terra (MapBiomas 2024)");if(a.lu.tot){if(a.luAt!=null&&a.luAt<250)T(`No ponto: ${luName(LEG[a.luAt][0])}.`,10,"bold");a.lu.cls.slice(0,8).forEach(c=>T(`${luName(LEG[c.k][0])}: ${P(c.pct)} do raio`,9.5));}else T("Sem dados.");
+  H2("Uso e cobertura da terra (MapBiomas, série 1985–2025)");seriesPDF(T,IMG2,TABLE,S,"área do raio");
+  if(a.lu.tot){if(a.luAt!=null&&a.luAt<250)T(`No ponto: ${luName(LEG[a.luAt][0])}.`,10,"bold");}
   H2("Fontes");SOURCES.forEach(s=>T("• "+s,8.5));
   H2("Como ler este relatório");T("Este relatório cruza o ponto escolhido com bases públicas oficiais. Estar perto de um processo ou projeto não significa que haverá obra ou mina; a etapa de cada processo indica o que já foi autorizado. As bases podem estar desatualizadas. Para confirmar, procure a ANM, a EPE/ANEEL, o INEMA, a Defensoria ou o Ministério Público. Nomes de pessoas físicas foram ocultados.",9);
   pm.textContent="Preparando o arquivo…";savePDF(FIN(),`relatorio-ponto_${a.y.toFixed(4)}_${a.x.toFixed(4)}.pdf`).then(r=>pm.textContent=r).catch(()=>pm.textContent="Não foi possível salvar o PDF.");}
@@ -548,6 +573,7 @@ async function analyzeTerritory(t){
   const near=(arr)=>{let best=null;const cx=(bb.w+bb.e)/2,cy=(bb.s+bb.n)/2;const cand=arr.map(l=>({l,lb:bbD(l.bb,cx,cy)})).sort((a,b)=>a.lb-b.lb).slice(0,25);for(const {l} of cand){const d=polyLineD(Rg,l.r);if(!best||d<best.d)best=Object.assign({d},l);}return best;};
   res.lte=near(LTE);res.ltp=near(LTP);
   res.sa=SA.filter(s=>bbOv(s.bb,bb)&&inPoly(s.p[0],s.p[1],Rg));res.inBA=[[bb.w,bb.s],[bb.e,bb.n],[(bb.w+bb.e)/2,(bb.s+bb.n)/2]].every(([x,y])=>inBahia(x,y));
+  res.series=await seriesPoly(Rg,bb).catch(()=>null);
   return res;}
 function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   const ltd=Math.min(r.lte?r.lte.d:1e9,r.ltp?r.ltp.d:1e9);
@@ -568,7 +594,7 @@ function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString
   if(!r.min.length)h+=`<p class="empty">Nenhum processo minerário sobre o território.</p>`;
   else{h+=`<div class="bars">${Object.entries(STAGE).filter(([k])=>r.stage[k]).map(([k,v])=>`<div class="bar"><span>${v.n}</span><div class="track"><div class="fill" style="width:${r.stage[k]}%;background:${v.c}"></div></div><span class="v">${pf(r.stage[k])}</span></div>`).join("")}</div><p style="margin:0;color:var(--mute);font-size:14px">Percentual da área do território coberta por processos em cada etapa (vale a etapa mais avançada).</p>`;
     h+=r.min.slice(0,8).map(m=>`<div class="item"><span class="tag in">${pf(m.pct)}</span><div><p class="what">${esc(m.subs.charAt(0)+m.subs.slice(1).toLowerCase())} · ${esc(m.fase.toLowerCase())}</p><p class="meta">Titular: ${esc(titular(m.nome))} · Processo ${esc(m.proc)} · cerca de ${fmtN(m.ha)} ha dentro do território</p><p class="plain">${esc((FASE[m.fase]||{}).txt||"")}</p></div></div>`).join("");
-    if(r.min.length>8)h+=`<p class="empty">E mais ${r.min.length-8} processos (todos no PDF).</p>`;}
+    if(r.min.length>8)h+=`<p class="empty">E mais ${r.min.length-8} processos.</p>`;h+=minTableHTML(r.min).replace("<th>Distância</th>","<th>% do território</th>").replace(/<td>(no ponto|[\d,.]+ (m|km))<\/td>/g,"<td>$1</td>");}
   h+=`</section><section class="blk"><h3>Energia</h3>`;
   r.eolIn.forEach(e=>{h+=`<div class="item"><span class="tag in">${pf(e.pct)}</span><div><p class="what">Parque eólico ${esc(e.name)} · ${fmtN(e.mw,1)} MW</p><p class="plain">${esc(enTxt(e.fase))}</p></div></div>`;});
   r.enNear.slice(0,6).forEach(e=>{h+=`<div class="item">${tag(e.d)}<div><p class="what">${e.tipo==="UFV"?"Usina solar":"Parque eólico"} ${esc(e.name)}${e.mw?" · "+fmtN(e.mw,1)+" MW":""}</p><p class="meta">${esc(enTxt(e.fase))}</p></div></div>`;});
@@ -579,12 +605,13 @@ function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString
   const TT=[...r.uc.map(x=>["Unidade de conservação",x]),...r.ti.map(x=>["Terra indígena",x]),...r.qu.map(x=>["Território quilombola",x]),...r.as.map(x=>["Assentamento (INCRA)",x])];
   h+=TT.length?TT.map(([l,x])=>`<div class="item"><span class="tag in">${pf(x.pct)}</span><div><p class="what">${esc(x.name)}</p><p class="meta">${l} · cerca de ${fmtN(x.ha)} ha em comum</p></div></div>`).join(""):`<p class="empty">Nenhuma sobreposição com unidades de conservação, terras indígenas, territórios quilombolas ou assentamentos do INCRA.</p>`;
   h+=`<p class="empty">${r.sa.length?`${r.sa.length} sítio(s) arqueológico(s) dentro do território.`:"Nenhum sítio arqueológico cadastrado dentro do território."}</p></section>`;
-  if(r.lu.length)h+=`<section class="blk"><h3>Uso e cobertura da terra</h3><div class="bars">${r.lu.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">MapBiomas 2024.</p></section>`;
+  h+=`<section class="blk"><h3>Uso e cobertura da terra</h3>${seriesBlock(r.series,"chartT")}</section>`;
+  if(false)h+=`<section class="blk"><h3>Uso e cobertura da terra</h3><div class="bars">${r.lu.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">MapBiomas 2024.</p></section>`;
   h+=`<section class="blk"><div class="row">${!t.saved?`<button type="button" class="btn" id="tsave2">Guardar e enviar</button>`:""}<button type="button" class="btn primary" id="tpdf">Baixar relatório do território em PDF</button></div><p class="msg" id="tpdfmsg" role="status"></p></section>
     <section class="blk"><details><summary>Como foi calculado</summary><p class="src">O território foi coberto por ${fmtN(r.samples)} pontos de amostra, um a cada ${r.stepM} m aproximadamente, e cada ponto foi cruzado com as bases. CAR e uso da terra usam células de cerca de 220 m. Áreas e percentuais são aproximados.</p></details></section></div>`;
-  out.innerHTML=h;$("tpdf").onclick=()=>makeTerrPDF(r);const s2=$("tsave2");if(s2)s2.onclick=async()=>{await saveTerritory(t,r);renderTerritory(r);};}
+  out.innerHTML=h;styleBlocks(out);wireChart("chartT",r.series);$("tpdf").onclick=()=>makeTerrPDF(r);const s2=$("tsave2");if(s2)s2.onclick=async()=>{await saveTerritory(t,r);renderTerritory(r);};}
 function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
-  const t=r.t,{T,H2,IMG,FIN}=pdfDoc(),P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
+  const t=r.t,{T,H2,IMG,IMG2,TABLE,FIN}=pdfDoc(),P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
   T("Olho no Território",20,"bold");T("Relatório de sobreposições no território da comunidade · Bahia",10,"normal",[90,99,93]);
   T(t.name,14,"bold");T(`${t.tipo||""} · ${fmtN(r.area,1)} ha · ${r.mun.join(", ")||"município não identificado"} (BA)${t.cod?" · "+t.cod:""}`,10);
   T(`Origem do limite: ${t.origem==="SICAR"?"cadastro coletivo no SICAR/CEFIR":t.origem==="desenho"?"desenhado no mapa":"arquivo enviado pela comunidade"} · Data: ${r.when.toLocaleString("pt-BR")}`,9,"normal",[90,99,93]);
@@ -594,7 +621,7 @@ function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textContent="
   r.car.coll.forEach(c=>T(`${c.tipo==="PCT"?"Outro cadastro coletivo":"Assentamento no CAR"} ${c.cod}${c.st==="CA"?" (cancelado)":""}: ${P(c.pct)} do território.`,9.5));
   T("O CAR é autodeclarado e a maioria dos cadastros aguarda análise do INEMA. Confira cada caso com a comunidade.",8.5,"italic",[70,78,72]);
   H2("Mineração (ANM/SIGMINE)");if(!r.min.length)T("Nenhum processo minerário sobre o território.");else{T(`${r.min.length} processo(s) sobre ${P(r.minPct)} do território. `+Object.entries(STAGE).filter(([k])=>r.stage[k]).map(([k,v])=>`${v.n}: ${P(r.stage[k])}`).join("; ")+".",10);
-    r.min.forEach(m=>{T(`${m.subs} | ${m.fase} | ${P(m.pct)} do território (cerca de ${fmtN(m.ha)} ha)`,9.5,"bold");T(`Titular: ${titular(m.nome)}. Processo ${m.proc}. Último evento: ${m.ev}.`,9);T(`O que significa: ${(FASE[m.fase]||{}).txt||""}`,9,"italic",[70,78,72]);});}
+    minTablePDF(TABLE,r.min,true);T("O que significa cada fase:",9.5,"bold");[...new Set(r.min.map(m=>m.fase))].forEach(f=>T(`• ${f}: ${(FASE[f]||{}).txt||""}`,8.5));}
   H2("Energia (EPE/ANEEL)");r.eolIn.forEach(e=>T(`SOBRE O TERRITÓRIO (${P(e.pct)}): ${e.name}, ${fmtN(e.mw,1)} MW, ${e.fase}. ${enTxt(e.fase)}`,9.5));
   r.enNear.forEach(e=>T(`a ${fmtKm(e.d)}: ${e.tipo==="UFV"?"solar":"eólica"} ${e.name}${e.mw?", "+fmtN(e.mw,1)+" MW":""}, ${e.fase}.`,9.5));
   if(!r.eolIn.length&&!r.enNear.length)T("Nenhum parque eólico ou usina solar a até 10 km.");
@@ -603,7 +630,7 @@ function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textContent="
   H2("Áreas protegidas, povos e comunidades");const TT=[...r.uc.map(x=>["Unidade de conservação",x]),...r.ti.map(x=>["Terra indígena",x]),...r.qu.map(x=>["Território quilombola",x]),...r.as.map(x=>["Assentamento (INCRA)",x])];
   if(TT.length)TT.forEach(([l,x])=>T(`${l}: ${x.name} (${P(x.pct)} do território)`,9.5));else T("Nenhuma sobreposição.");
   T(r.sa.length?`${r.sa.length} sítio(s) arqueológico(s) dentro do território.`:"Nenhum sítio arqueológico cadastrado dentro do território.",9.5);
-  if(r.lu.length){H2("Uso e cobertura da terra (MapBiomas 2024)");r.lu.slice(0,8).forEach(c=>T(`${luName(LEG[c.k][0])}: ${P(c.pct)}`,9.5));}
+  H2("Uso e cobertura da terra (MapBiomas, série 1985–2025)");seriesPDF(T,IMG2,TABLE,r.series,"área do território");
   H2("Fontes");SOURCES.forEach(s=>T("• "+s,8.5));T(`Cálculo por amostragem com ${fmtN(r.samples)} pontos dentro do território. Valores aproximados.`,8.5,"italic",[70,78,72]);
   pm.textContent="Preparando o arquivo…";savePDF(FIN(),`territorio_${t.name.normalize("NFD").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"comunidade"}.pdf`).then(m=>pm.textContent=m).catch(()=>pm.textContent="Não foi possível salvar o PDF.");}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
@@ -705,8 +732,8 @@ function renderCfg(){const c=$("cfg");c.innerHTML=`<label>Endereço do script (t
 
 /* mapa offline */
 async function cacheAll(){const b=$("offbtn"),m=$("offmsg");if(!("caches" in window)){m.textContent="Este navegador não guarda o mapa para uso sem internet.";return;}
-  const urls=[DATA_URL+"base.json",DATA_URL+"lu/overview.png"];B.tiles.forEach(([k,nm,nb,lu])=>{urls.push(DATA_URL+"t/"+k+".json");if(lu)urls.push(DATA_URL+"lu/"+k+".png",DATA_URL+"car/"+k+".png");});
-  b.disabled=true;let done=0,fail=0;const c=await caches.open("ot-dados-v1");
+  const urls=[DATA_URL+"base.json",DATA_URL+"lu/overview.png"];B.tiles.forEach(([k,nm,nb,lu])=>{urls.push(DATA_URL+"t/"+k+".json");if(lu)urls.push(DATA_URL+"lu/"+k+".png",DATA_URL+"car/"+k+".png",DATA_URL+"s/"+k+".gz");});urls.push(DATA_URL+"s/index.json");
+  b.disabled=true;let done=0,fail=0;const c=await caches.open("ot-dados-v2");
   const work=async()=>{while(urls.length){const u=urls.shift();try{if(!(await c.match(u))){const r=await fetch(u);if(r.ok)await c.put(u,r);else fail++;}}catch(e){fail++;}done++;m.textContent=`Baixando o mapa: ${Math.round(done/(done+urls.length)*100)}%`;}};
   await Promise.all([work(),work(),work(),work()]);b.disabled=false;
   m.textContent=fail?`Faltaram ${fail} arquivos. Tente de novo com internet melhor.`:"Mapa da Bahia guardado no celular. As consultas funcionam sem internet.";if(!fail)lsSet("ot_offline",new Date().toISOString());}
@@ -765,11 +792,120 @@ async function saveConsulta(a){const m=$("pdfmsg");
     processosMinerarios:[...a.minIn,...a.minNear].slice(0,40).map(x=>`${x.proc} ${x.subs} – ${x.fase} (${x.d===0?"no ponto":fmtKm(x.d)})`),
     energia:a.enR.map(e=>`${e.name} (${e.fase}, ${fmtKm(e.d)})`),areasProtegidas:a.terr.map(t=>`${t.lab}: ${t.name} (${t.d===0?"no ponto":fmtKm(t.d)})`),
     car:{noPonto:!!a.car.at,pctRaio:a.car.p1!=null?Math.round(a.car.p1):null,coletivos:a.car.coll.map(c=>c.cod),grandes:a.car.big.length},
-    usoNoPonto:a.luAt!=null&&a.luAt<250?luName(LEG[a.luAt][0]):""});m.textContent="Consulta guardada.";}
+    usoNoPonto:a.luAt!=null&&a.luAt<250?luName(LEG[a.luAt][0]):"",
+    carCompleto:a.carL?{total:a.carL.list.length,noPonto:a.carL.list.filter(c=>c.d===0).map(c=>c.cod),codigos:a.carL.list.slice(0,300).map(c=>c.cod+" ("+c.tipo+", "+Math.round(c.area)+" ha)")}:null,
+    serie:a.series?a.series.byYear.filter(b=>b.yr%5===0).map(b=>`${b.yr}: nativa ${Math.round(b.g.nat)}%, agropecuária ${Math.round(b.g.agr)}%`):null});m.textContent="Consulta guardada.";}
   catch(e){m.textContent=e.message||"Não foi possível guardar.";}}
 async function initDB(){renderWho();renderTList();renderRegForm();renderRList();renderCfg();updSync();sync();
   $("offbtn").onclick=cacheAll;const off=lsGet("ot_offline");if(off)$("offmsg").textContent="Mapa guardado no celular em "+new Date(off).toLocaleDateString("pt-BR")+".";
   if(!PESSOA)showGate(false);}
+
+/* ---------- MapBiomas Coleção 11: série histórica 1985–2025 ---------- */
+const MBC={"3": ["Formação Florestal", "1f8d49", "nat"], "6": ["Floresta Alagável", "007785", "nat"], "4": ["Formação Savânica", "7dc975", "nat"], "7": ["Savana Alagada (beta)", "228c70", "nat"], "5": ["Mangue", "04381d", "nat"], "49": ["Restinga Arbórea", "02d659", "nat"], "12": ["Formação Campestre", "d6bc74", "nat"], "77": ["Formação Herbáceo Arbustiva (beta)", "86b074", "nat"], "11": ["Campo Alagado e Área Pantanosa", "519799", "nat"], "84": ["Marisma (beta)", "81dbbf", "nat"], "50": ["Restinga Herbácea ou Arbustiva", "ffaa5f", "nat"], "32": ["Apicum", "fc8114", "nat"], "29": ["Afloramento Rochoso", "ad5100", "nat"], "15": ["Pastagem", "edde8e", "agr"], "39": ["Soja", "f5b3c8", "agr"], "20": ["Cana", "db7093", "agr"], "40": ["Arroz", "c71585", "agr"], "62": ["Algodão (beta)", "ff69b4", "agr"], "41": ["Outras Lavouras Temporárias", "f54ca9", "agr"], "46": ["Café", "d68fe2", "agr"], "47": ["Citrus", "9932cc", "agr"], "35": ["Dendê", "9065d0", "agr"], "48": ["Outras Lavouras Perenes", "e6ccff", "agr"], "9": ["Silvicultura", "7a5900", "agr"], "21": ["Mosaico de Usos", "ffefc3", "agr"], "23": ["Praia, Duna e Areal", "ffa07a", "nv"], "24": ["Área Urbanizada", "d4271e", "nv"], "30": ["Mineração", "9c0027", "nv"], "75": ["Usina Fotovoltaica", "757272", "nv"], "91": ["Parque eólico (beta)", "403d3e", "nv"], "25": ["Outras Áreas não Vegetadas", "db4d4f", "nv"], "33": ["Rio, Lago e Oceano", "2532e4", "agua"], "31": ["Aquicultura", "091077", "agua"]};
+const mbName=c=>(MBC[c]||["Outra classe ("+c+")"])[0];
+/* 4 grupos para o gráfico – cores da paleta categórica validada (slots 1–4) */
+const GRP=[{id:"agua",n:"Água",c:"#2a78d6",cd:"#3987e5"},{id:"nv",n:"Área não vegetada (cidade, mineração, solar e outras)",s:"Área não vegetada",c:"#eb6834",cd:"#d95926"},
+ {id:"nat",n:"Vegetação nativa (floresta, caatinga, cerrado, campos)",s:"Vegetação nativa",c:"#1baf7a",cd:"#199e70"},{id:"agr",n:"Agropecuária (pasto, lavouras, silvicultura, mosaico)",s:"Agropecuária",c:"#eda100",cd:"#c98500"}];
+const dark=()=>matchMedia("(prefers-color-scheme: dark)").matches;
+let SIDX=null;const SC=new Map();
+async function seriesIndex(){if(SIDX)return SIDX;try{const r=await fetch(DATA_URL+"s/index.json");if(!r.ok)return null;SIDX=await r.json();}catch(e){return null;}return SIDX;}
+async function gunzip(buf){return new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());}
+function loadSeriesTile(k){if(SC.has(k))return SC.get(k);const p=(async()=>{const I=await seriesIndex();if(!I||!I.tiles.includes(k))return null;const r=await fetch(DATA_URL+"s/"+k+".gz");if(!r.ok)return null;return await gunzip(await r.arrayBuffer());})().catch(()=>null);SC.set(k,p);return p;}
+async function seriesCount(test,bb){const I=await seriesIndex();if(!I)return null;const N=I.N,NY=I.years.length,c=1/N;
+  const keys=tilesFor(bb.w,bb.s,bb.e,bb.n);const arrs=await Promise.all(keys.map(loadSeriesTile));if(arrs.every(a=>!a))return null;
+  const cnt=I.years.map(()=>new Map());let tot=0;
+  keys.forEach((k,ti)=>{const A=arrs[ti];if(!A)return;const [tx,ty]=k.split("_").map(Number);
+    const i0=Math.max(0,Math.floor((bb.w-tx)*N)),i1=Math.min(N-1,Math.floor((bb.e-tx)*N)),j0=Math.max(0,Math.floor((ty+1-bb.n)*N)),j1=Math.min(N-1,Math.floor((ty+1-bb.s)*N));
+    for(let j=j0;j<=j1;j++){const cy=ty+1-(j+.5)*c;for(let i=i0;i<=i1;i++){const cx=tx+(i+.5)*c;if(!test(cx,cy))continue;const p=(j*N+i)*NY;if(A[p+NY-1]===0)continue;tot++;for(let y=0;y<NY;y++){const v=A[p+y];const m=cnt[y];m.set(v,(m.get(v)||0)+1);}}}});
+  if(!tot)return null;
+  const byYear=I.years.map((yr,yi)=>{const m=cnt[yi];const valid=[...m.entries()].filter(([v])=>v!==0&&v!==27).reduce((s,[,n])=>s+n,0)||1;const cls={};const g={nat:0,agr:0,nv:0,agua:0};
+    for(const [v,n] of m){if(v===0||v===27)continue;cls[v]=n/valid*100;const gr=(MBC[v]||[0,0,"nv"])[2];if(g[gr]!=null)g[gr]+=n/valid*100;}return {yr,cls,g};});
+  return {years:I.years,tot,byYear,cellM:Math.round(111320/N),col:I.col||"Coleção 11"};}
+function seriesCircle(x,y,R){const kx=KXf(y),dlon=R/kx,dlat=R/KY;return seriesCount((cx,cy)=>Math.hypot((cx-x)*kx,(cy-y)*KY)<=R,{w:x-dlon,e:x+dlon,s:y-dlat,n:y+dlat});}
+function seriesPoly(rings,bb){return seriesCount((cx,cy)=>inPoly(cx,cy,rings),bb);}
+function seriesBlock(S,id){
+  if(!S)return `<p class="empty">A série histórica do MapBiomas não está disponível neste local${navigator.onLine?"":" sem internet (baixe o mapa da Bahia com Wi-Fi para usar no campo)"}.</p>`;
+  const f=S.byYear[0],l=S.byYear[S.byYear.length-1];const dn=l.g.nat-f.g.nat,da=l.g.agr-f.g.agr;
+  const pp=v=>(v>0?"+":"")+v.toFixed(1).replace(".",",")+" pontos";
+  let h=`<p style="margin:0"><strong>De ${f.yr} a ${l.yr}</strong>, a vegetação nativa passou de <strong>${pf(f.g.nat)}</strong> para <strong>${pf(l.g.nat)}</strong> da área (${pp(dn)}), e a agropecuária de <strong>${pf(f.g.agr)}</strong> para <strong>${pf(l.g.agr)}</strong> (${pp(da)}).</p>
+  <figure class="chart" id="${id}"><figcaption>Uso e cobertura da terra, ${f.yr}–${l.yr} (% da área)</figcaption>
+  <div class="ckeys">${GRP.slice().reverse().map(g=>`<span><i style="background:${dark()?g.cd:g.c}"></i>${g.s||g.n}</span>`).join("")}</div>
+  <div class="cwrap">${chartSVG(S)}<div class="ctip" hidden></div></div></figure>
+  <details><summary>Ver tabela por classe e ano</summary>${seriesTable(S)}</details>
+  <p class="empty" style="font-size:13px">MapBiomas ${S.col}, mapas anuais 1985–2025, amostrados numa grade de cerca de ${S.cellM} m (${fmtN(S.tot)} células). Mineração e usinas solares aparecem no grupo "área não vegetada"; veja os valores na tabela.</p>`;
+  return h;}
+function chartSVG(S){const W0=400,H0=250,ml=36,mr=40,mt=10,mb=24,pw=W0-ml-mr,ph=H0-mt-mb;const n=S.years.length;
+  const X=i=>ml+i/(n-1)*pw,Y=v=>mt+(1-v/100)*ph;let s=`<svg viewBox="0 0 ${W0} ${H0}" role="img" aria-label="Gráfico de linhas da série histórica de uso da terra">`;
+  for(const v of [0,25,50,75,100])s+=`<line x1="${ml}" x2="${ml+pw}" y1="${Y(v)}" y2="${Y(v)}" class="cg"/><text x="${ml-6}" y="${Y(v)+4}" text-anchor="end" class="ct">${v}%</text>`;
+  S.years.forEach((yr,i)=>{if(yr%10===5||yr===2025)s+=`<text x="${X(i)}" y="${H0-8}" text-anchor="middle" class="ct">${yr}</text>`;});
+  const ends=[];
+  for(const g of GRP){const col=dark()?g.cd:g.c;const pts=S.byYear.map((b,i)=>`${X(i).toFixed(1)},${Y(b.g[g.id]).toFixed(1)}`).join(" ");s+=`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lv=S.byYear[n-1].g[g.id];s+=`<circle cx="${X(n-1)}" cy="${Y(lv)}" r="4" fill="${col}" class="cdot"/>`;ends.push({y:Y(lv),t:pf(lv)});}
+  ends.sort((a,b)=>a.y-b.y);for(let i=1;i<ends.length;i++)if(ends[i].y-ends[i-1].y<13)ends[i].y=ends[i-1].y+13;
+  for(let i=ends.length-1;i>0;i--)if(ends[i].y>mt+ph+4){ends[i].y=mt+ph+4;for(let k=i-1;k>=0;k--)if(ends[k+1].y-ends[k].y<13)ends[k].y=ends[k+1].y-13;}
+  ends.forEach(e=>{s+=`<text x="${X(n-1)+8}" y="${e.y+4}" class="cl">${esc(e.t)}</text>`;});
+  s+=`<line class="cx" x1="0" x2="0" y1="${mt}" y2="${mt+ph}" visibility="hidden"/><rect class="chit" x="${ml}" y="${mt}" width="${pw}" height="${ph}" fill="transparent"/></svg>`;return s;}
+function wireChart(id,S){const fig=$(id);if(!fig||!S)return;const svg=fig.querySelector("svg"),tip=fig.querySelector(".ctip"),cx=svg.querySelector(".cx"),hit=svg.querySelector(".chit");
+  const n=S.years.length,ml=36,pw=400-36-40;
+  const move=e=>{const r=svg.getBoundingClientRect();const sx=(e.clientX-r.left)/r.width*400;const i=Math.max(0,Math.min(n-1,Math.round((sx-ml)/pw*(n-1))));const xx=ml+i/(n-1)*pw;cx.setAttribute("x1",xx);cx.setAttribute("x2",xx);cx.setAttribute("visibility","visible");
+    const b=S.byYear[i];tip.hidden=false;tip.innerHTML=`<b>${b.yr}</b>`+GRP.slice().reverse().map(g=>`<span><i style="background:${dark()?g.cd:g.c}"></i>${g.s}: ${pf(b.g[g.id])}</span>`).join("")+(b.cls[30]?`<span>Mineração: ${b.cls[30]<0.1?"<0,1":b.cls[30].toFixed(1).replace(".",",")}%</span>`:"");
+    const left=xx/400*r.width;tip.style.left=Math.min(r.width-170,Math.max(0,left-85))+"px";};
+  hit.addEventListener("pointermove",move);hit.addEventListener("pointerdown",move);hit.addEventListener("pointerleave",()=>{tip.hidden=true;cx.setAttribute("visibility","hidden");});}
+const KEYYEARS=S=>S.years.filter(y=>y%5===0);
+function seriesTable(S){const ys=KEYYEARS(S);const idx=ys.map(y=>S.years.indexOf(y));const last=S.byYear[S.byYear.length-1];
+  const codes=[...new Set(S.byYear.flatMap(b=>Object.keys(b.cls).map(Number)))].sort((a,b)=>(last.cls[b]||0)-(last.cls[a]||0));
+  const v=x=>x==null||x===0?"–":(x<0.1?"<0,1":x.toFixed(1).replace(".",","));
+  let h=`<div class="tscroll"><table class="tbl"><thead><tr><th>Classe</th>${ys.map(y=>`<th>${y}</th>`).join("")}</tr></thead><tbody>`;
+  for(const g of GRP.slice().reverse()){h+=`<tr class="tg"><td>${g.s}</td>${idx.map(i=>`<td>${v(S.byYear[i].g[g.id])}</td>`).join("")}</tr>`;
+    codes.filter(c=>(MBC[c]||[0,0,"nv"])[2]===g.id).forEach(c=>{h+=`<tr><td>${esc(mbName(c))}</td>${idx.map(i=>`<td>${v(S.byYear[i].cls[c])}</td>`).join("")}</tr>`;});}
+  return h+`</tbody></table></div><p class="empty" style="font-size:13px">Valores em % da área analisada.</p>`;}
+function chartPNG(S){const c=document.createElement("canvas");const W0=1400,H0=560,ml=80,mr=300,mt=24,mb=50,pw=W0-ml-mr,ph=H0-mt-mb,n=S.years.length;c.width=W0;c.height=H0;const g=c.getContext("2d");
+  g.fillStyle="#fff";g.fillRect(0,0,W0,H0);const X=i=>ml+i/(n-1)*pw,Y=v=>mt+(1-v/100)*ph;g.font="22px Helvetica, Arial";g.fillStyle="#5a635d";g.strokeStyle="#e2e5dd";g.lineWidth=2;
+  for(const v of [0,25,50,75,100]){g.beginPath();g.moveTo(ml,Y(v));g.lineTo(ml+pw,Y(v));g.stroke();g.textAlign="right";g.fillText(v+"%",ml-10,Y(v)+7);}
+  g.textAlign="center";S.years.forEach((y,i)=>{if(y%5===0)g.fillText(y,X(i),H0-14);});
+  const ends=[];for(const G of GRP){g.strokeStyle=G.c;g.lineWidth=4;g.lineJoin="round";g.beginPath();S.byYear.forEach((b,i)=>{const yy=Y(b.g[G.id]);i?g.lineTo(X(i),yy):g.moveTo(X(i),yy);});g.stroke();
+    const lv=S.byYear[n-1].g[G.id];g.fillStyle=G.c;g.beginPath();g.arc(X(n-1),Y(lv),7,0,7);g.fill();ends.push({y:Y(lv),t:`${G.s} ${pf(lv)}`});}
+  ends.sort((a,b)=>a.y-b.y);for(let i=1;i<ends.length;i++)if(ends[i].y-ends[i-1].y<26)ends[i].y=ends[i-1].y+26;
+  g.fillStyle="#1b211e";g.textAlign="left";g.font="22px Helvetica, Arial";ends.forEach(e=>g.fillText(e.t,X(n-1)+16,e.y+7));return c.toDataURL("image/png");}
+function seriesPDF(T,IMG2,TABLE,S,area){if(!S){T("Série histórica do MapBiomas indisponível para este local.",9.5);return;}
+  const f=S.byYear[0],l=S.byYear[S.byYear.length-1];
+  T(`De ${f.yr} a ${l.yr}, a vegetação nativa passou de ${pf(f.g.nat)} para ${pf(l.g.nat)} da ${area}, e a agropecuária de ${pf(f.g.agr)} para ${pf(l.g.agr)}.`,10);
+  IMG2(chartPNG(S),`Gráfico: uso e cobertura da terra ${f.yr}–${l.yr}, em % da ${area}. Fonte: MapBiomas ${S.col}.`);
+  const ys=KEYYEARS(S),idx=ys.map(y=>S.years.indexOf(y));const v=x=>x==null||x===0?"–":(x<0.1?"<0,1":x.toFixed(1).replace(".",","));
+  const codes=[...new Set(S.byYear.flatMap(b=>Object.keys(b.cls).map(Number)))].sort((a,b)=>(l.cls[b]||0)-(l.cls[a]||0));const body=[];
+  for(const g of GRP.slice().reverse()){body.push([{content:g.s,styles:{fontStyle:"bold"}},...idx.map(i=>({content:v(S.byYear[i].g[g.id]),styles:{fontStyle:"bold"}}))]);codes.filter(c=>(MBC[c]||[0,0,"nv"])[2]===g.id).forEach(c=>body.push(["   "+mbName(c),...idx.map(i=>v(S.byYear[i].cls[c]))]));}
+  TABLE(["Classe (% da área)",...ys.map(String)],body,{fontSize:7.5});}
+
+/* ---------- CAR completo no raio (consulta ao vivo no SICAR) ---------- */
+const CAR_WFS="https://geoserver.car.gov.br/geoserver/sicar/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=sicar:sicar_imoveis_ba&outputFormat=application/json&srsName=EPSG:4326&sortBy=cod_imovel";
+const CTIPO={IRU:"Imóvel rural",AST:"Assentamento",PCT:"Povos e comunidades tradicionais (CEFIR coletivo)"};
+const CST={AT:"Ativo",PE:"Pendente",SU:"Suspenso",CA:"Cancelado"};
+const carCache=new Map();
+async function carList(x,y,R){const key=[x.toFixed(5),y.toFixed(5),R].join();if(carCache.has(key))return carCache.get(key);
+  const kx=KXf(y),pts=[];for(let i=0;i<=32;i++){const a=i/32*2*Math.PI;pts.push((x+Math.cos(a)*R/kx).toFixed(5)+" "+(y+Math.sin(a)*R/KY).toFixed(5));}
+  const f=`INTERSECTS(geo_area_imovel,SRID=4326;POLYGON((${pts.join(",")})))`;const feats=[];let start=0,matched=null;
+  while(true){const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),45000);
+    const r=await fetch(CAR_WFS+`&count=2000&startIndex=${start}&CQL_FILTER=`+encodeURIComponent(f),{signal:ctl.signal});clearTimeout(to);
+    if(!r.ok)throw new Error("SICAR respondeu "+r.status);const j=await r.json();matched=j.numberMatched;feats.push(...j.features);if(j.features.length<2000||feats.length>=12000)break;start+=2000;}
+  const list=feats.map(ft=>{const p=ft.properties||{};const rings=[];const g=ft.geometry;if(g&&g.type==="MultiPolygon")g.coordinates.forEach(pl=>pl.forEach(rg=>rings.push(rg)));else if(g&&g.type==="Polygon")g.coordinates.forEach(rg=>rings.push(rg));
+    const bb=rings.length?bboxR(rings):{w:x,e:x,s:y,n:y};return {cod:p.cod_imovel,tipo:p.tipo_imovel,st:p.status_imovel,cond:p.condicao,mun:p.municipio,area:+p.area||0,mf:+p.m_fiscal||0,criado:(p.dat_criacao||"").slice(0,10),atual:(p.data_atualizacao||"").slice(0,10),r:rings,bb,d:rings.length?polyD(x,y,rings):null};})
+    .sort((a,b)=>(a.d??1e9)-(b.d??1e9)||b.area-a.area);
+  const res={list,matched,trunc:matched!=null&&matched>list.length,when:new Date()};carCache.set(key,res);return res;}
+const dBR=s=>s?s.split("-").reverse().join("/"):"";
+function carListHTML(L){if(!L)return "";const n=L.list.length;const by={};L.list.forEach(c=>by[c.tipo]=(by[c.tipo]||0)+1);const inPt=L.list.filter(c=>c.d===0);
+  let h=`<p style="margin:0"><strong>${fmtN(n)} cadastro${n===1?"":"s"} do CAR</strong> encostam no raio: ${Object.entries(by).map(([t,k])=>`${k} ${(CTIPO[t]||t).toLowerCase()}`).join(", ")}.${inPt.length?` ${inPt.length} cobre${inPt.length>1?"m":""} o ponto escolhido.`:""}</p>`;
+  if(L.trunc)h+=`<p class="warnbox">O raio tem ${fmtN(L.matched)} cadastros; a lista mostra os ${fmtN(n)} primeiros. Use um raio menor para ver todos.</p>`;
+  h+=`<details class="full"><summary>Ver a lista completa (${fmtN(n)})</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Distância</th><th>Código do imóvel</th><th>Tipo</th><th>Município</th><th>Área (ha)</th><th>Módulos fiscais</th><th>Situação</th><th>Condição</th><th>Cadastro</th></tr></thead><tbody>`+
+    L.list.map(c=>`<tr><td>${c.d===0?"no ponto":c.d==null?"–":fmtKm(c.d)}</td><td class="mono">${esc(c.cod)}</td><td>${esc(CTIPO[c.tipo]||c.tipo)}</td><td>${esc(c.mun)}</td><td>${fmtN(c.area,2)}</td><td>${fmtN(c.mf,2)}</td><td>${esc(CST[c.st]||c.st)}</td><td>${esc(c.cond)}</td><td>${dBR(c.criado)}</td></tr>`).join("")+`</tbody></table></div></details>`;
+  return h;}
+
+/* ---------- lista completa de mineração (igual ao SIGMINE) ---------- */
+function minTableHTML(all){if(!all.length)return "";return `<details class="full"><summary>Ver a lista completa (${all.length} processo${all.length>1?"s":""})</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Distância</th><th>Processo</th><th>Número</th><th>Ano</th><th>Área (ha)</th><th>Fase</th><th>Último evento</th><th>Nome</th><th>Substância</th><th>Uso</th><th>UF</th></tr></thead><tbody>`+
+  all.map(m=>{const [nu,an]=String(m.proc).split("/");return `<tr><td>${m.d===0?"no ponto":fmtKm(m.d)}</td><td class="mono">${esc(m.proc)}</td><td>${esc(nu)}</td><td>${esc(an)}</td><td>${fmtN(m.area,2)}</td><td>${esc(m.fase)}</td><td>${esc(m.ev)}</td><td>${esc(titular(m.nome))}</td><td>${esc(m.subs)}</td><td>${esc(m.uso)}</td><td>BA</td></tr>`;}).join("")+`</tbody></table></div></details>`;}
+function minTablePDF(TABLE,all,terr){const body=all.map(m=>{const [nu,an]=String(m.proc).split("/");return [terr?(m.pct<1?"<1%":Math.round(m.pct)+"%"):(m.d===0?"no ponto":fmtKm(m.d)),m.proc,nu,an,fmtN(m.area,2),m.fase,m.ev,titular(m.nome),m.subs,m.uso,"BA"];});
+  TABLE([terr?"% do território":"Distância","Processo","Número","Ano","Área (ha)","Fase","Último evento","Nome","Substância","Uso","UF"],body,{fontSize:6.5,landscapeHint:true,colW:{6:38,7:30}});}
+function carTablePDF(TABLE,L){if(!L||!L.list.length)return;TABLE(["Distância","Código do imóvel","Tipo","Município","Área (ha)","Mód. fiscais","Situação","Condição","Cadastro"],
+  L.list.map(c=>[c.d===0?"no ponto":c.d==null?"–":fmtKm(c.d),c.cod,CTIPO[c.tipo]||c.tipo,c.mun,fmtN(c.area,2),fmtN(c.mf,2),CST[c.st]||c.st,c.cond,dBR(c.criado)]),{fontSize:6.5,colW:{1:52}});}
 
 /* ---------- samples & boot ---------- */
 const SAMPLES=[["Fundo de pasto, Pilão Arcado", -43.1144, -10.1696], ["Eólicas, Sento Sé", -41.2, -10.05], ["Ouro, Jacobina", -40.52, -11.18], ["Urânio e ferro, Caetité", -42.48, -14.06], ["Quilombo, Iguape (Cachoeira)", -38.8478, -12.6867], ["Oeste agrícola, São Desidério", -45.7, -12.5]];

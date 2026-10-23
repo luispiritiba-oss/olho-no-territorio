@@ -1,6 +1,6 @@
 /* Olho no Território – funcionamento sem internet */
-const SHELL="ot-app-v3", DADOS="ot-dados-v1", EXT="ot-ext-v1";
-const SHELL_FILES=["./","index.html","instalar.html","app.js","config.js","manifest.webmanifest","icons/icon-192.png","icons/icon-512.png","d/base.json","d/lu/overview.png"];
+const SHELL="ot-app-v4", DADOS="ot-dados-v2", EXT="ot-ext-v1";
+const SHELL_FILES=["./","index.html","instalar.html","app.js","config.js","manifest.webmanifest","icons/icon-192.png","icons/icon-512.png","icons/campanha.jpg","d/base.json","d/lu/overview.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(SHELL).then(c=>c.addAll(SHELL_FILES.filter(f=>!f.startsWith("d/")))).then(()=>caches.open(DADOS)).then(c=>c.addAll(["d/base.json","d/lu/overview.png"])).then(()=>self.skipWaiting()));});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>![SHELL,DADOS,EXT].includes(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 async function cacheFirst(req,name){const c=await caches.open(name);const hit=await c.match(req,{ignoreSearch:true});if(hit)return hit;const r=await fetch(req);if(r&&(r.ok||r.type==="opaque"))c.put(req,r.clone());return r;}

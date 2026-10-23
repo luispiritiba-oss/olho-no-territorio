@@ -21,7 +21,7 @@
   --paper:#f2f3ee; --card:#fbfbf8; --ink:#1b211e; --mute:#5a635d; --line:#d3d8cd;
   --accent:#0d6a52; --accent-ink:#ffffff; --accent-soft:#dcebe4;
   --alert:#b0261d; --alert-soft:#f6dedb; --warn:#9a5b00; --warn-soft:#f6e7cc; --ok:#2e6a39; --ok-soft:#dfeedd;
-  --mapbg:#e7e9e1; --mapline:#8d958c;
+  --mapbg:#e7e9e1; --mapline:#8d958c; --mapmask:rgba(231,233,225,.93);
   --f-display:"Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
   --f-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -30,12 +30,12 @@
   --paper:#141816; --card:#1c211e; --ink:#e9ece6; --mute:#a3ada5; --line:#323a35;
   --accent:#4fbf98; --accent-ink:#06261c; --accent-soft:#1d3a30;
   --alert:#ff8a7f; --alert-soft:#43201d; --warn:#f2b45a; --warn-soft:#3b2c14; --ok:#8fd19b; --ok-soft:#1f3423;
-  --mapbg:#202622; --mapline:#5f6a63; color-scheme:dark}}
+  --mapbg:#202622; --mapline:#5f6a63; --mapmask:rgba(20,24,22,.92); color-scheme:dark}}
 :root[data-theme="dark"]{
   --paper:#141816; --card:#1c211e; --ink:#e9ece6; --mute:#a3ada5; --line:#323a35;
   --accent:#4fbf98; --accent-ink:#06261c; --accent-soft:#1d3a30;
   --alert:#ff8a7f; --alert-soft:#43201d; --warn:#f2b45a; --warn-soft:#3b2c14; --ok:#8fd19b; --ok-soft:#1f3423;
-  --mapbg:#202622; --mapline:#5f6a63; color-scheme:dark}
+  --mapbg:#202622; --mapline:#5f6a63; --mapmask:rgba(20,24,22,.92); color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;margin:0}
 .wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
@@ -137,15 +137,55 @@ footer.note{margin-top:18px;font-size:13px;color:var(--mute);max-width:80ch}
 .consent p{margin:0}
 .tform .chk{display:flex}
 #install{position:fixed;right:16px;bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:5;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+
+/* faixa da campanha */
+.banner{background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px;display:flex;justify-content:center;margin-bottom:14px}
+.banner img{display:block;width:100%;max-width:400px;height:auto}
+/* blocos do relatório com destaque */
+#out{background:var(--paper);border:0}
+.rep{gap:14px}
+.rep>.head,.rep>.chips{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.rep section.blk{--k:var(--accent);background:var(--card);border:1px solid var(--line);border-top:6px solid var(--k);border-radius:14px;padding:12px 14px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.rep section.blk h3{display:flex;align-items:center;gap:8px;color:var(--k)}
+.rep section.blk h3::before{content:"";width:12px;height:12px;border-radius:3px;background:var(--k);flex:none}
+.rep section.blk.k-min{--k:#b0261d}.rep section.blk.k-en{--k:#1f4fbf}.rep section.blk.k-ter{--k:#2e7d32}.rep section.blk.k-car{--k:#5b6f8c}.rep section.blk.k-lu{--k:#8a6d00}.rep section.blk.k-act{--k:var(--accent);border-top-width:1px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rep section.blk.k-min{--k:#ff8a7f}:root:not([data-theme="light"]) .rep section.blk.k-en{--k:#8fb0ff}:root:not([data-theme="light"]) .rep section.blk.k-ter{--k:#8fd19b}:root:not([data-theme="light"]) .rep section.blk.k-car{--k:#a9bad3}:root:not([data-theme="light"]) .rep section.blk.k-lu{--k:#f2c85a}}
+/* tabelas completas */
+details.full{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--paper)}
+details.full summary{font-size:15px}
+.tscroll{overflow:auto;max-height:60vh;margin-top:8px;-webkit-overflow-scrolling:touch}
+.tbl{border-collapse:collapse;font-size:13px;min-width:100%}
+.tbl th,.tbl td{border-bottom:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:top;white-space:nowrap}
+.tbl td:nth-child(n+2){white-space:normal;min-width:6em}
+.tbl th{position:sticky;top:0;background:var(--card);font-size:12px;color:var(--mute);z-index:1}
+.tbl tr.tg td{font-weight:700;background:var(--card)}
+.tbl .mono{font-size:12px;white-space:nowrap}
+/* gráfico da série histórica */
+figure.chart{margin:4px 0 0}
+figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
+.ckeys{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin-bottom:4px}
+.ckeys span{display:inline-flex;align-items:center;gap:6px}
+.ckeys i,.ctip i{display:inline-block;width:12px;height:3px;border-radius:2px}
+.cwrap{position:relative}
+.cwrap svg{width:100%;height:auto;display:block;touch-action:pan-y}
+.cwrap .cg{stroke:var(--line);stroke-width:1}
+.cwrap .ct{fill:var(--mute);font-size:13px;font-family:var(--f-body)}
+.cwrap .cl{fill:var(--ink);font-size:13px;font-weight:700;font-family:var(--f-body)}
+.cwrap .cdot{stroke:var(--card);stroke-width:2}
+.cwrap .cx{stroke:var(--mute);stroke-width:1;stroke-dasharray:3 3}
+.ctip{position:absolute;top:0;width:170px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:12px;display:flex;flex-direction:column;gap:2px;box-shadow:0 4px 12px rgba(0,0,0,.12);pointer-events:none}
+.ctip span{display:flex;align-items:center;gap:6px}
 </style>
 
 </head>
 <body>
 <main class="wrap gate" id="gate" hidden>
+  <div class="banner"><img src="icons/campanha.jpg" alt="Campanha Permanente em Defesa dos Territórios Tradicionais" width="554" height="463"></div>
   <header class="top"><div><h1>Olho no Território</h1><p class="sub">Antes de começar, preencha seus dados. Eles são pedidos uma vez e ficam neste celular para os próximos registros.</p></div></header>
   <div class="panel ask"><h2>Seu cadastro</h2><div class="tform" id="gform"><p class="hintsmall">Carregando…</p></div></div>
 </main>
 <div class="wrap" id="app">
+  <div class="banner"><img src="icons/campanha.jpg" alt="Campanha Permanente em Defesa dos Territórios Tradicionais" width="554" height="463"></div>
   <header class="top">
     <div>
       <h1>Olho no Território</h1>
@@ -242,7 +282,7 @@ footer.note{margin-top:18px;font-size:13px;color:var(--mute);max-width:80ch}
 
   <div class="panel ask" style="margin-top:18px">
     <h2>Usar sem internet</h2>
-    <p class="hintsmall">Baixe o mapa da Bahia inteira (cerca de 19 MB) com Wi-Fi antes de ir a campo. Depois as consultas funcionam sem sinal, e os registros ficam guardados até a internet voltar.</p>
+    <p class="hintsmall">Baixe o mapa da Bahia inteira e a série histórica do MapBiomas com Wi-Fi antes de ir a campo. Depois as consultas funcionam sem sinal, e os registros ficam guardados até a internet voltar.</p>
     <div class="row"><button type="button" class="btn" id="offbtn">Baixar mapa da Bahia</button></div>
     <p class="msg" id="offmsg" role="status"></p>
     <p class="hintsmall"><a href="instalar.html">Página de instalação</a> · envie esse link para outras pessoas instalarem o aplicativo.</p>
@@ -253,6 +293,7 @@ footer.note{margin-top:18px;font-size:13px;color:var(--mute);max-width:80ch}
 <button type="button" class="btn primary" id="install" hidden>Instalar no celular</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 <script>
