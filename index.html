@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Olho no Território Bahia</title>
+<meta name="description" content="Consulta de mineração, energia, CAR/CEFIR, áreas protegidas e uso da terra em qualquer ponto da Bahia, com registros de campo.">
+<meta name="theme-color" content="#0d6a52">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Olho no Território">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+[hidden]{display:none!important}
+/* Layout: one-column field tool for phones. Map on top, consultation and community panels below; on wide screens map left, panels right. */
+:root{
+  --paper:#f2f3ee; --card:#fbfbf8; --ink:#1b211e; --mute:#5a635d; --line:#d3d8cd;
+  --accent:#0d6a52; --accent-ink:#ffffff; --accent-soft:#dcebe4;
+  --alert:#b0261d; --alert-soft:#f6dedb; --warn:#9a5b00; --warn-soft:#f6e7cc; --ok:#2e6a39; --ok-soft:#dfeedd;
+  --mapbg:#e7e9e1; --mapline:#8d958c;
+  --f-display:"Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#141816; --card:#1c211e; --ink:#e9ece6; --mute:#a3ada5; --line:#323a35;
+  --accent:#4fbf98; --accent-ink:#06261c; --accent-soft:#1d3a30;
+  --alert:#ff8a7f; --alert-soft:#43201d; --warn:#f2b45a; --warn-soft:#3b2c14; --ok:#8fd19b; --ok-soft:#1f3423;
+  --mapbg:#202622; --mapline:#5f6a63; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#141816; --card:#1c211e; --ink:#e9ece6; --mute:#a3ada5; --line:#323a35;
+  --accent:#4fbf98; --accent-ink:#06261c; --accent-soft:#1d3a30;
+  --alert:#ff8a7f; --alert-soft:#43201d; --warn:#f2b45a; --warn-soft:#3b2c14; --ok:#8fd19b; --ok-soft:#1f3423;
+  --mapbg:#202622; --mapline:#5f6a63; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 20px;margin-bottom:12px}
+h1{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,6vw,40px);line-height:1;margin:0;letter-spacing:-.02em;text-wrap:balance}
+.sub{color:var(--mute);margin:6px 0 0;max-width:62ch}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:4px 10px;border-radius:99px;background:var(--warn-soft);color:var(--warn);font-weight:700}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px}
+.mapbox{position:relative;overflow:hidden}
+@media (min-width:861px){.mapbox{position:sticky;top:12px}}
+canvas#map{display:block;width:100%;height:min(60vh,580px);min-height:330px;touch-action:none;cursor:crosshair;border-radius:14px 14px 0 0;background:var(--mapbg)}
+.mapctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+.mapctl button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:20px;font-weight:700;cursor:pointer}
+.maphint{position:absolute;left:10px;top:10px;background:var(--card);border:1px solid var(--line);padding:6px 10px;border-radius:10px;font-size:13px;color:var(--mute);max-width:70%}
+.mapload{position:absolute;left:10px;bottom:10px;background:var(--card);border:1px solid var(--line);padding:4px 10px;border-radius:10px;font-size:12px;color:var(--mute)}
+.legend{padding:12px 14px;display:flex;flex-wrap:wrap;gap:6px}
+.lg{display:inline-flex;align-items:center;gap:7px;font-size:13px;border:1px solid var(--line);border-radius:99px;padding:4px 10px 4px 8px;background:transparent;color:var(--ink);cursor:pointer;font-family:inherit}
+.lg[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+.sw{width:14px;height:14px;border-radius:4px;flex:none}
+.ask{padding:16px;display:flex;flex-direction:column;gap:12px}
+.ask h2,.rep h2{font-family:var(--f-display);font-weight:800;font-size:22px;margin:0;letter-spacing:-.01em}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font-family:inherit;font-size:16px;font-weight:700;border-radius:12px;padding:12px 16px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;min-height:48px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.sm{min-height:38px;padding:7px 11px;font-size:14px}
+.btn:focus-visible,.lg:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+input,select,textarea{font-family:inherit;font-size:16px;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:var(--paper);color:var(--ink);min-height:48px;max-width:100%}
+textarea{min-height:90px;resize:vertical;width:100%}
+input#coord{flex:1 1 220px;min-width:0;font-family:var(--f-mono);font-size:15px}
+input#mun{flex:1 1 200px;min-width:0}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);font-weight:700}
+.samples{display:flex;flex-wrap:wrap;gap:6px}
+.samples button{font-family:inherit;font-size:14px;border:1px dashed var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:8px 10px;cursor:pointer}
+.msg{font-size:14px;color:var(--mute);min-height:1.5em;margin:0}
+.msg.err{color:var(--alert)}
+.helpbox{background:var(--accent-soft);border-radius:12px;padding:10px 12px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+.helpbox ol{margin:0;padding-left:20px}
+.rep{padding:18px 16px 20px;display:flex;flex-direction:column;gap:18px}
+.rep .head{display:flex;flex-direction:column;gap:4px}
+.mono{font-family:var(--f-mono);font-size:14px}
+.chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.chip{border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.chip b{font-family:var(--f-display);font-size:24px;line-height:1.1}
+.chip span{font-size:13px;line-height:1.3}
+.chip.in{background:var(--alert-soft);color:var(--alert)}
+.chip.near{background:var(--warn-soft);color:var(--warn)}
+.chip.none{background:var(--ok-soft);color:var(--ok)}
+section.blk{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+section.blk h3{font-family:var(--f-display);font-weight:800;font-size:19px;margin:0}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:start}
+.tag{font-size:12px;font-weight:700;border-radius:6px;padding:2px 7px;white-space:nowrap;margin-top:2px}
+.tag.in{background:var(--alert-soft);color:var(--alert)}
+.tag.near{background:var(--warn-soft);color:var(--warn)}
+.item p{margin:0;overflow-wrap:anywhere}
+.item .what{font-weight:700}
+.item .meta{font-size:14px;color:var(--mute)}
+.plain{font-size:15px;background:var(--paper);border-radius:10px;padding:8px 10px;margin:0}
+.bars{display:flex;flex-direction:column;gap:6px}
+.bar{display:grid;grid-template-columns:minmax(0,9.5em) minmax(0,1fr) 3.4em;gap:8px;align-items:center;font-size:14px}
+.bar .track{height:12px;border-radius:6px;background:var(--paper);overflow:hidden}
+.bar .fill{height:100%;border-radius:6px}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--f-mono);font-size:13px}
+.empty{color:var(--mute);font-size:15px;margin:0}
+.src{font-size:13px;color:var(--mute)}
+.src li{margin-bottom:4px}
+details summary{cursor:pointer;font-weight:700}
+.placeholder{padding:24px 18px;color:var(--mute)}
+.placeholder p{margin:0 0 8px;max-width:50ch}
+.hintsmall{font-size:14px;color:var(--mute);margin:0}
+.drawbar{background:var(--accent-soft);border-radius:12px;padding:8px}
+.drawbar span{flex:1 1 180px;font-size:14px}
+.tform{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px}
+.tform label{font-size:14px;font-weight:700;display:flex;flex-direction:column;gap:4px}
+.tform .chk{flex-direction:row;align-items:flex-start;gap:8px;font-weight:400}
+.tform .chk input{min-height:auto;width:20px;height:20px;margin-top:2px}
+.titem{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
+.titem .nm{flex:1 1 160px;min-width:0}
+.titem .nm b{display:block;overflow-wrap:anywhere}
+.titem .nm span{font-size:13px;color:var(--mute)}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:14px;margin:0}
+.loading{display:flex;align-items:center;gap:10px;padding:24px 18px;color:var(--mute)}
+.spin{width:18px;height:18px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent)}
+@media (prefers-reduced-motion:no-preference){.spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}.rep{animation:rise .25s ease-out}@keyframes rise{from{transform:translateY(6px);opacity:.6}to{transform:none;opacity:1}}}
+footer.note{margin-top:18px;font-size:13px;color:var(--mute);max-width:80ch}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.who{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px}
+.who:empty{display:none}
+.who .nm{flex:1 1 200px;min-width:0}.who .nm b{display:block}.who .nm span{font-size:13px;color:var(--mute)}
+.sync{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-radius:12px;padding:8px 12px;font-size:14px;margin-bottom:12px}
+.sync span{flex:1 1 200px}
+.sync.ok{background:var(--ok-soft);color:var(--ok)}.sync.warn{background:var(--warn-soft);color:var(--warn)}.sync.err{background:var(--alert-soft);color:var(--alert)}
+.gate{max-width:560px}
+.gate .tform input:not([type=checkbox]){width:100%}
+.consent{background:var(--paper);border-radius:12px;padding:10px 12px;font-size:14px;display:flex;flex-direction:column;gap:8px}
+.consent p{margin:0}
+.tform .chk{display:flex}
+#install{position:fixed;right:16px;bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:5;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+</style>
+
+</head>
+<body>
+<main class="wrap gate" id="gate" hidden>
+  <header class="top"><div><h1>Olho no Território</h1><p class="sub">Antes de começar, preencha seus dados. Eles são pedidos uma vez e ficam neste celular para os próximos registros.</p></div></header>
+  <div class="panel ask"><h2>Seu cadastro</h2><div class="tform" id="gform"><p class="hintsmall">Carregando…</p></div></div>
+</main>
+<div class="wrap" id="app">
+  <header class="top">
+    <div>
+      <h1>Olho no Território</h1>
+      <p class="sub">Escolha um ponto ou insira o território da comunidade e veja o que existe ali e ao redor: mineração, energia, CAR/CEFIR, áreas protegidas, povos e comunidades e uso da terra.</p>
+    </div>
+    <span class="pill">Bahia · versão de campo</span>
+  </header>
+  <div class="who" id="who"></div>
+  <div class="sync" id="sync" role="status"></div>
+
+  <div class="grid">
+    <div class="panel mapbox">
+      <canvas id="map" aria-label="Mapa da Bahia. Toque para escolher um ponto."></canvas>
+      <div class="maphint" id="hint">Carregando o mapa da Bahia…</div>
+      <div class="mapload" id="mapload" hidden></div>
+      <div class="mapctl">
+        <button type="button" id="zin" aria-label="Aproximar">+</button>
+        <button type="button" id="zout" aria-label="Afastar">−</button>
+        <button type="button" id="zall" aria-label="Ver a Bahia toda" style="font-size:14px">BA</button>
+      </div>
+      <div class="legend" id="legend" aria-label="Camadas do mapa"></div>
+    </div>
+
+    <div class="col">
+      <div class="panel ask">
+        <h2>Consultar um ponto</h2>
+        <div class="row">
+          <button type="button" class="btn primary" id="gps">Usar minha localização</button>
+          <label class="btn" for="foto">Usar foto do local</label>
+          <input type="file" id="foto" accept="image/jpeg,image/*" hidden>
+        </div>
+        <div class="helpbox" id="lochelp" hidden></div>
+        <label class="label" for="coord">Cole coordenadas ou um link de mapa</label>
+        <div class="row">
+          <input id="coord" autocomplete="off" placeholder="-10.5445, -40.4047 ou link do Google Maps">
+          <button type="button" class="btn" id="go">Consultar</button>
+        </div>
+        <div class="row">
+          <label class="label" for="raio">Raio de busca</label>
+          <select id="raio">
+            <option value="1">1 km</option>
+            <option value="5" selected>5 km</option>
+            <option value="10">10 km</option>
+          </select>
+        </div>
+        <label class="label" for="mun">Ir para um município</label>
+        <div class="row">
+          <input id="mun" list="munlist" autocomplete="off" placeholder="Nome do município">
+          <datalist id="munlist"></datalist>
+        </div>
+        <div>
+          <div class="label" style="margin-bottom:6px">Pontos de exemplo</div>
+          <div class="samples" id="samples"></div>
+        </div>
+        <p class="msg" id="msg" role="status"></p>
+      </div>
+
+      <div class="panel" id="out">
+        <div class="placeholder">
+          <p><strong>Nenhum ponto escolhido ainda.</strong></p>
+          <p>Toque no mapa, cole coordenadas ou use um ponto de exemplo. O resultado aparece aqui e pode ser baixado em PDF.</p>
+        </div>
+      </div>
+
+      <div class="panel ask" id="terrPanel">
+        <h2>Território da comunidade</h2>
+        <p class="hintsmall">Insira o CEFIR coletivo ou outro limite do território para ver o que se sobrepõe a ele.</p>
+        <div class="row">
+          <label class="btn" for="tfile">Carregar arquivo</label>
+          <input type="file" id="tfile" accept=".zip,.kml,.kmz,.geojson,.json,.shp,.shx,.dbf,.prj" multiple hidden>
+          <button type="button" class="btn" id="tdraw">Desenhar no mapa</button>
+        </div>
+        <p class="hintsmall">Aceita o shapefile baixado do CEFIR/SICAR (.zip), KML, KMZ ou GeoJSON. Num cadastro coletivo que já aparece no mapa, use o botão "Analisar este território" do resultado.</p>
+        <div class="row drawbar" id="tdrawbar" hidden>
+          <span id="tdrawinfo">Toque no mapa para marcar os cantos do território.</span>
+          <button type="button" class="btn" id="tundo">Desfazer</button>
+          <button type="button" class="btn primary" id="tdone">Concluir</button>
+          <button type="button" class="btn" id="tcancel">Cancelar</button>
+        </div>
+        <div id="tform" hidden></div>
+        <p class="msg" id="tmsg" role="status"></p>
+        <div id="tlist"></div>
+      </div>
+
+      <div class="panel ask" id="regPanel">
+        <h2>Registros de campo</h2>
+        <p class="hintsmall">Anote o que a equipe viu no local. O registro fica salvo com as coordenadas do ponto consultado.</p>
+        <div id="rform"></div>
+        <p class="msg" id="rmsg" role="status"></p>
+        <div id="rlist"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel ask" style="margin-top:18px">
+    <h2>Usar sem internet</h2>
+    <p class="hintsmall">Baixe o mapa da Bahia inteira (cerca de 19 MB) com Wi-Fi antes de ir a campo. Depois as consultas funcionam sem sinal, e os registros ficam guardados até a internet voltar.</p>
+    <div class="row"><button type="button" class="btn" id="offbtn">Baixar mapa da Bahia</button></div>
+    <p class="msg" id="offmsg" role="status"></p>
+    <p class="hintsmall"><a href="instalar.html">Página de instalação</a> · envie esse link para outras pessoas instalarem o aplicativo.</p>
+    <details><summary>Configuração do envio (para a equipe)</summary><div class="tform" id="cfg" style="margin-top:10px"></div></details>
+  </div>
+  <footer class="note" id="foot"></footer>
+</div>
+<button type="button" class="btn primary" id="install" hidden>Instalar no celular</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
+let deferredInstall=null;const ib=document.getElementById("install");
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;ib.hidden=false;});
+ib.onclick=async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;ib.hidden=true;};
+window.addEventListener("appinstalled",()=>{ib.hidden=true;});
+</script>
+</body>
+</html>

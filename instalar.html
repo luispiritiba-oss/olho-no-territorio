@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Instalar Olho no Território</title>
+<meta name="description" content="Toque para instalar o aplicativo Olho no Território no seu celular.">
+<meta name="theme-color" content="#0d6a52">
+<meta property="og:title" content="Instalar o aplicativo Olho no Território">
+<meta property="og:description" content="Mineração, energia, CAR/CEFIR, áreas protegidas e uso da terra em qualquer ponto da Bahia. Toque para instalar.">
+<meta property="og:image" content="icons/icon-512.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Olho no Território">
+<style>
+:root{--paper:#f2f3ee;--card:#fbfbf8;--ink:#1b211e;--mute:#5a635d;--line:#d3d8cd;--accent:#0d6a52;--accent-ink:#fff;--soft:#dcebe4;--warn:#9a5b00;--warn-soft:#f6e7cc}
+@media (prefers-color-scheme:dark){:root{--paper:#141816;--card:#1c211e;--ink:#e9ece6;--mute:#a3ada5;--line:#323a35;--accent:#4fbf98;--accent-ink:#06261c;--soft:#1d3a30;--warn:#f2b45a;--warn-soft:#3b2c14;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:18px;line-height:1.5}
+main{max-width:520px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-left)) 48px}
+.logo{width:96px;height:96px;border-radius:22px;display:block;margin:0 auto 14px;box-shadow:0 6px 20px rgba(0,0,0,.15)}
+h1{font-size:28px;line-height:1.15;text-align:center;margin:0 0 6px}
+.sub{text-align:center;color:var(--mute);margin:0 0 22px;font-size:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+.big{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:64px;border:0;border-radius:14px;background:var(--accent);color:var(--accent-ink);font-size:21px;font-weight:800;font-family:inherit;cursor:pointer;text-decoration:none}
+.big.sec{background:transparent;color:var(--ink);border:1px solid var(--line);font-size:18px;min-height:54px;font-weight:700;margin-top:10px}
+.big[disabled]{opacity:.55}
+ol{margin:8px 0 0;padding-left:0;list-style:none;counter-reset:s}
+ol li{counter-increment:s;display:grid;grid-template-columns:40px 1fr;gap:10px;align-items:start;margin-bottom:14px}
+ol li::before{content:counter(s);width:34px;height:34px;border-radius:50%;background:var(--soft);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center}
+.ic{display:inline-flex;vertical-align:-5px;width:24px;height:24px;border:1.5px solid currentColor;border-radius:6px;align-items:center;justify-content:center;font-size:15px;font-weight:800;margin:0 2px}
+.note{font-size:15px;color:var(--mute);margin:10px 0 0}
+.warn{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:12px 14px;font-size:16px;margin-bottom:14px}
+.ok{background:var(--soft);color:var(--accent);border-radius:12px;padding:12px 14px;font-weight:700;margin-top:12px;text-align:center}
+#qr{display:flex;justify-content:center;margin:12px 0}
+#qr img,#qr canvas{width:220px;height:220px;image-rendering:pixelated;background:#fff;padding:10px;border-radius:12px}
+.url{font-family:ui-monospace,Menlo,monospace;font-size:14px;word-break:break-all;text-align:center;color:var(--mute)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="icons/icon-512.png" alt="">
+  <h1>Olho no Território</h1>
+  <p class="sub">Mineração, energia, CAR/CEFIR, áreas protegidas e uso da terra em qualquer ponto da Bahia.</p>
+
+  <!-- navegador de aplicativo (WhatsApp, Instagram, Facebook) -->
+  <div class="warn" id="inapp" hidden>
+    <strong>Abra no navegador do celular para instalar.</strong><br>
+    <span id="inappTxt"></span>
+  </div>
+
+  <!-- Android / Chrome -->
+  <section class="card" id="android" hidden>
+    <button class="big" id="btnInstall" type="button" disabled>Preparando…</button>
+    <div class="ok" id="done" hidden>Pronto! O ícone do Olho no Território está na tela inicial.</div>
+    <div id="manual" hidden>
+      <p style="margin:14px 0 4px;font-weight:700">Se o botão não funcionar:</p>
+      <ol>
+        <li><span>Toque nos <b>três pontinhos <span class="ic">⋮</span></b> no canto de cima do navegador.</span></li>
+        <li><span>Toque em <b>Instalar aplicativo</b> ou <b>Adicionar à tela inicial</b>.</span></li>
+        <li><span>Confirme em <b>Instalar</b>.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- iPhone -->
+  <section class="card" id="ios" hidden>
+    <p style="margin:0 0 6px;font-weight:700">No iPhone são 3 toques:</p>
+    <ol>
+      <li><span>Toque no botão <b>Compartilhar</b> <span class="ic">↑</span>, embaixo (ou em cima) da tela.</span></li>
+      <li><span>Role a lista e toque em <b>Adicionar à Tela de Início</b> <span class="ic">+</span>.</span></li>
+      <li><span>Toque em <b>Adicionar</b>, no canto de cima.</span></li>
+    </ol>
+    <p class="note" id="iosNotSafari" hidden>Isso só funciona no <b>Safari</b>. Copie o link e abra no Safari.</p>
+  </section>
+
+  <!-- computador -->
+  <section class="card" id="desk" hidden>
+    <p style="margin:0;font-weight:700;text-align:center">Aponte a câmera do celular para o código:</p>
+    <div id="qr"></div>
+    <p class="url" id="url"></p>
+  </section>
+
+  <section class="card" id="already" hidden>
+    <div class="ok" style="margin:0">O aplicativo já está instalado neste celular.</div>
+  </section>
+
+  <a class="big sec" href="./" id="open">Abrir o aplicativo sem instalar</a>
+  <button class="big sec" id="share" type="button" hidden>Enviar este link para outra pessoa</button>
+  <button class="big sec" id="copy" type="button">Copiar o link</button>
+  <p class="note" style="text-align:center">Depois de instalar, abra o aplicativo, preencha seu cadastro e, com Wi-Fi, toque em <b>Baixar mapa da Bahia</b> para usar no campo sem internet.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const ua=navigator.userAgent||"";
+const isIOS=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const isAndroid=/Android/i.test(ua);
+const inApp=/FBAN|FBAV|Instagram|Line\/|WhatsApp|; wv\)|Telegram/i.test(ua);
+const isSafari=isIOS&&/Safari/.test(ua)&&!/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua);
+const standalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+const link=location.href.split("#")[0].split("?")[0];
+$("url").textContent=link;
+
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+if(standalone){$("already").hidden=false;$("open").textContent="Abrir o aplicativo";}
+else if(isIOS){$("ios").hidden=false;if(!isSafari){$("iosNotSafari").hidden=false;}if(inApp){$("inapp").hidden=false;$("inappTxt").textContent="Toque nos três pontinhos ou no ícone de bússola e escolha “Abrir no Safari”.";}}
+else if(isAndroid||"onbeforeinstallprompt" in window&&/Mobi/i.test(ua)){
+  $("android").hidden=false;
+  if(inApp){$("inapp").hidden=false;$("inappTxt").textContent="Toque nos três pontinhos ⋮ no canto de cima e escolha “Abrir no Chrome” (ou “Abrir no navegador”). Depois toque no botão verde.";}
+}else{$("desk").hidden=false;$("android").hidden=false;}
+
+// QR code (computador)
+try{if(!$("desk").hidden&&window.qrcode){const q=qrcode(0,"M");q.addData(link);q.make();$("qr").innerHTML=q.createImgTag(8,0,"Código QR do link de instalação");}}catch(e){}
+
+let deferred=null;const btn=$("btnInstall");
+const showManual=()=>{if(!deferred){btn.textContent="Instalar";btn.disabled=false;$("manual").hidden=false;}};
+setTimeout(showManual,4000);
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;btn.disabled=false;btn.textContent="⬇  Instalar no celular";$("manual").hidden=true;});
+btn.onclick=async()=>{
+  if(!deferred){$("manual").hidden=false;$("manual").scrollIntoView({behavior:"smooth"});return;}
+  deferred.prompt();const c=await deferred.userChoice;deferred=null;
+  if(c&&c.outcome==="accepted"){btn.hidden=true;$("done").hidden=false;$("manual").hidden=true;$("open").textContent="Abrir o aplicativo";}
+  else{btn.textContent="Instalar";$("manual").hidden=false;}
+};
+window.addEventListener("appinstalled",()=>{btn.hidden=true;$("done").hidden=false;$("manual").hidden=true;});
+
+if(navigator.share){$("share").hidden=false;$("share").onclick=()=>navigator.share({title:"Olho no Território",text:"Instale o aplicativo Olho no Território:",url:link}).catch(()=>{});}
+$("copy").onclick=async()=>{try{await navigator.clipboard.writeText(link);$("copy").textContent="Link copiado ✓";}catch(e){prompt("Copie o link:",link);}};
+})();
+</script>
+</body>
+</html>
