@@ -423,7 +423,7 @@ function summary(a){const S=[];
   S.push({k:lt<=a.R?"near":"none",b:fmtKm(lt),t:"até a linha de transmissão mais próxima"});
   const tIn=a.terr.filter(t=>t.d===0),tN=a.terr.filter(t=>t.d>0);
   S.push({k:tIn.length?"in":(tN.length?"near":"none"),b:tIn.length||tN.length,t:tIn.length?"área protegida ou território no ponto":(tN.length?"área protegida ou território no raio":"sem área protegida ou território no raio")});
-  if(a.car.at!=null)S.push({k:a.car.at?"near":"none",b:a.car.at?"Sim":"Não",t:a.car.at?"há imóvel do CAR declarado no ponto":"nenhum imóvel do CAR declarado no ponto"});
+  if(a.car.at!=null)S.push({k:a.car.at?"near":"none",b:a.car.at?"Sim":"Não",t:a.car.at?"há imóvel do CAR declarado no ponto":"há imóvel do CAR declarado no ponto"});
   return S;}
 function styleBlocks(root){root.querySelectorAll("section.blk").forEach(sec=>{const h=sec.querySelector("h3");const t=h?h.textContent:"";
   sec.classList.add(/Minera/.test(t)?"k-min":/Energia/.test(t)?"k-en":/protegidas|povos/.test(t)?"k-ter":/CAR/.test(t)?"k-car":/Uso e cobertura/.test(t)?"k-lu":"k-act");});}
@@ -541,7 +541,7 @@ function pdfDoc(){const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",form
   const need=h=>{if(st.y+h>282){doc.addPage();st.y=18;}};
   const T=(s,sz=10,f="normal",col=[27,33,30])=>{doc.setFont("helvetica",f);doc.setFontSize(sz);doc.setTextColor(...col);const L=doc.splitTextToSize(String(s),PW);need(L.length*sz*0.42+1);doc.text(L,M,st.y);st.y+=L.length*sz*0.42+1.5;};
   const H2=s=>{st.y+=3;need(12);doc.setDrawColor(200);doc.line(M,st.y-2,M+PW,st.y-2);T(s,13,"bold",[13,106,82]);};
-  const IMG=(img,cap)=>{need(PW*0.62+8);doc.addImage(img,"JPEG",M+PW*0.19,st.y,PW*0.62,PW*0.62);st.y+=PW*0.62+2;T(cap,8,"normal",[90,99,93]);};
+  const IMG=(img,cap)=>{need(PW*0.62+8);doc.addImage(img,"JPEG",M+PW*0.19,st.y,PW*0.62,PW*0.62);st.y+=PW*0.62+5;T(cap,8,"normal",[90,99,93]);};
   const FIN=(name)=>{const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(120);doc.text(`Olho no Território · versão de teste · página ${i} de ${n}`,M,290);}return doc.output("blob");};
   const IMG2=(img,cap)=>{const h=PW*0.4;need(h+12);doc.addImage(img,"JPEG",M,st.y,PW,h);st.y+=h+2;T(cap,8,"normal",[90,99,93]);};
   const TABLE=(head,body,o={})=>{if(!doc.autoTable){T("(tabela indisponível: o gerador de tabelas não carregou)",8);return;}const cs={};Object.entries(o.colW||{}).forEach(([k,v])=>cs[k]={cellWidth:v});
