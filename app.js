@@ -198,7 +198,7 @@ function requestCarWms(){const v={w:view.w,e:view.e,s:view.s,n:view.n};const key
     const url=CAR_WMS+`?service=WMS&version=1.1.1&request=GetMap&layers=sicar:sicar_imoveis_ba&styles=&srs=EPSG:4326&bbox=${v.w},${v.s},${v.e},${v.n}&width=${w}&height=${h}&format=image/png&transparent=true`;
     const ml=$("mapload");ml.hidden=false;ml.textContent="Carregando os imóveis do CAR…";
     const im=new Image();im.crossOrigin="anonymous";im.onload=()=>{if(id!==carWmsId)return;try{const cv2=document.createElement("canvas");cv2.width=w;cv2.height=h;const g=cv2.getContext("2d");g.drawImage(im,0,0);const d=g.getImageData(0,0,w,h);const p=d.data;
-        for(let i=0;i<p.length;i+=4){if(!p[i+3])continue;const L=p[i];if(L>150){p[i]=91;p[i+1]=111;p[i+2]=140;p[i+3]=55;}else if(L<60){p[i]=30;p[i+1]=58;p[i+2]=104;p[i+3]=235;}else{p[i]=50;p[i+1]=80;p[i+2]=125;p[i+3]=150;}}
+        for(let i=0;i<p.length;i+=4){if(!p[i+3])continue;const L=p[i];if(L>150){p[i]=91;p[i+1]=111;p[i+2]=140;p[i+3]=22;}else if(L<60){p[i]=30;p[i+1]=58;p[i+2]=104;p[i+3]=235;}else{p[i]=50;p[i+1]=80;p[i+2]=125;p[i+3]=150;}}
         g.putImageData(d,0,0);carWms={img:cv2,v};}catch(e){carWms=null;}ml.hidden=true;draw();};
     im.onerror=()=>{if(id===carWmsId){ml.hidden=true;}};im.src=url;},350);}
 let drawQ=false; function draw(){ if(drawQ)return; drawQ=true; requestAnimationFrame(()=>{drawQ=false; drawNow(ctx,{});}); }
@@ -233,7 +233,7 @@ function initBases(){const box=$("bases");if(!box)return;box.innerHTML=Object.en
 /* imagem do CAR (WMS do SICAR) recolorida */
 function carWmsImage(v,w,h){return new Promise((res,rej)=>{const url=CAR_WMS+`?service=WMS&version=1.1.1&request=GetMap&layers=sicar:sicar_imoveis_ba&styles=&srs=EPSG:4326&bbox=${v.w},${v.s},${v.e},${v.n}&width=${w}&height=${h}&format=image/png&transparent=true`;
   const im=new Image();im.crossOrigin="anonymous";im.onload=()=>{try{const cv2=document.createElement("canvas");cv2.width=w;cv2.height=h;const g=cv2.getContext("2d");g.drawImage(im,0,0);const d=g.getImageData(0,0,w,h);const p=d.data;
-    for(let i=0;i<p.length;i+=4){if(!p[i+3])continue;const L=p[i];if(L>150){p[i]=91;p[i+1]=111;p[i+2]=140;p[i+3]=55;}else if(L<60){p[i]=30;p[i+1]=58;p[i+2]=104;p[i+3]=235;}else{p[i]=50;p[i+1]=80;p[i+2]=125;p[i+3]=150;}}
+    for(let i=0;i<p.length;i+=4){if(!p[i+3])continue;const L=p[i];if(L>150){p[i]=91;p[i+1]=111;p[i+2]=140;p[i+3]=22;}else if(L<60){p[i]=30;p[i+1]=58;p[i+2]=104;p[i+3]=235;}else{p[i]=50;p[i+1]=80;p[i+2]=125;p[i+3]=150;}}
     g.putImageData(d,0,0);res({img:cv2,v});}catch(e){rej(e);}};im.onerror=()=>rej(new Error("wms"));im.src=url;});}
 function drawNow(c,opts){
   const s=opts.scale||DPR; c.setTransform(s,0,0,s,0,0);
@@ -506,6 +506,7 @@ $("foot").textContent="Versão de teste em campo. Os dados vêm de bases públic
 async function snapshotA(bb,selPt){const S=900;const cx=(bb.w+bb.e)/2,cy=(bb.s+bb.n)/2,kx=KXf(cy),span=Math.max((bb.e-bb.w)*kx,(bb.n-bb.s)*KY);
   const sv={w:cx-span/2/kx,e:cx+span/2/kx,s:cy-span/2/KY,n:cy+span/2/KY};
   await ensure(sv.w,sv.s,sv.e,sv.n).catch(()=>{});await preloadBase(sv,S,9000).catch(()=>{});
+  if(on("lu")&&navigator.onLine){try{const tpl=await mbUrl(MBYEAR);const z=zoomFor(sv,S,1,14);const tl=baseTilesFor(sv,z);if(tl.length<=120)await Promise.race([Promise.all(tl.map(([x,y])=>baseTile(turl(tpl,z,x,y)).p)),new Promise(r=>setTimeout(r,10000))]);}catch(e){}}
   let wms=null;if(on("car")&&(sv.e-sv.w)<=CARWMS_MAX*1.5&&navigator.onLine){wms=await Promise.race([carWmsImage(sv,S,S).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),12000))]);}
   const off=document.createElement("canvas");off.width=S;off.height=S;const c=off.getContext("2d");const keep={view,W,H,sel,carWms};W=S;H=S;view=sv;carWms=wms;
   if(!selPt)sel=null;let ok=true;
