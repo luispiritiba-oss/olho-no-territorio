@@ -834,7 +834,7 @@ function seriesBlock(S,id){
   <details><summary>Ver tabela por classe e ano</summary>${seriesTable(S)}</details>
   <p class="empty" style="font-size:13px">MapBiomas ${S.col}, mapas anuais 1985–2025, amostrados numa grade de cerca de ${S.cellM} m (${fmtN(S.tot)} células). Mineração e usinas solares aparecem no grupo "área não vegetada"; veja os valores na tabela.</p>`;
   return h;}
-function chartSVG(S){const W0=400,H0=250,ml=36,mr=40,mt=10,mb=24,pw=W0-ml-mr,ph=H0-mt-mb;const n=S.years.length;
+function chartSVG(S){const W0=400,H0=250,ml=46,mr=40,mt=10,mb=24,pw=W0-ml-mr,ph=H0-mt-mb;const n=S.years.length;
   const X=i=>ml+i/(n-1)*pw,Y=v=>mt+(1-v/100)*ph;let s=`<svg viewBox="0 0 ${W0} ${H0}" role="img" aria-label="Gráfico de linhas da série histórica de uso da terra">`;
   for(const v of [0,25,50,75,100])s+=`<line x1="${ml}" x2="${ml+pw}" y1="${Y(v)}" y2="${Y(v)}" class="cg"/><text x="${ml-6}" y="${Y(v)+4}" text-anchor="end" class="ct">${v}%</text>`;
   S.years.forEach((yr,i)=>{if(yr%10===5||yr===2025)s+=`<text x="${X(i)}" y="${H0-8}" text-anchor="middle" class="ct">${yr}</text>`;});
@@ -846,7 +846,7 @@ function chartSVG(S){const W0=400,H0=250,ml=36,mr=40,mt=10,mb=24,pw=W0-ml-mr,ph=
   ends.forEach(e=>{s+=`<text x="${X(n-1)+8}" y="${e.y+4}" class="cl">${esc(e.t)}</text>`;});
   s+=`<line class="cx" x1="0" x2="0" y1="${mt}" y2="${mt+ph}" visibility="hidden"/><rect class="chit" x="${ml}" y="${mt}" width="${pw}" height="${ph}" fill="transparent"/></svg>`;return s;}
 function wireChart(id,S){const fig=$(id);if(!fig||!S)return;const svg=fig.querySelector("svg"),tip=fig.querySelector(".ctip"),cx=svg.querySelector(".cx"),hit=svg.querySelector(".chit");
-  const n=S.years.length,ml=36,pw=400-36-40;
+  const n=S.years.length,ml=46,pw=400-46-40;
   const move=e=>{const r=svg.getBoundingClientRect();const sx=(e.clientX-r.left)/r.width*400;const i=Math.max(0,Math.min(n-1,Math.round((sx-ml)/pw*(n-1))));const xx=ml+i/(n-1)*pw;cx.setAttribute("x1",xx);cx.setAttribute("x2",xx);cx.setAttribute("visibility","visible");
     const b=S.byYear[i];tip.hidden=false;tip.innerHTML=`<b>${b.yr}</b>`+GRP.slice().reverse().map(g=>`<span><i style="background:${dark()?g.cd:g.c}"></i>${g.s}: ${pf(b.g[g.id])}</span>`).join("")+(b.cls[30]?`<span>Mineração: ${b.cls[30]<0.1?"<0,1":b.cls[30].toFixed(1).replace(".",",")}%</span>`:"");
     const left=xx/400*r.width;tip.style.left=Math.min(r.width-170,Math.max(0,left-85))+"px";};
