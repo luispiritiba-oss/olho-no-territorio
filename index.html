@@ -150,6 +150,12 @@ footer.note{margin-top:18px;font-size:13px;color:var(--mute);max-width:80ch}
 .rep section.blk h3::before{content:"";width:12px;height:12px;border-radius:3px;background:var(--k);flex:none}
 .rep section.blk.k-min{--k:#b0261d}.rep section.blk.k-en{--k:#1f4fbf}.rep section.blk.k-ter{--k:#2e7d32}.rep section.blk.k-car{--k:#5b6f8c}.rep section.blk.k-lu{--k:#8a6d00}.rep section.blk.k-act{--k:var(--accent);border-top-width:1px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rep section.blk.k-min{--k:#ff8a7f}:root:not([data-theme="light"]) .rep section.blk.k-en{--k:#8fb0ff}:root:not([data-theme="light"]) .rep section.blk.k-ter{--k:#8fd19b}:root:not([data-theme="light"]) .rep section.blk.k-car{--k:#a9bad3}:root:not([data-theme="light"]) .rep section.blk.k-lu{--k:#f2c85a}}
+/* cartão do imóvel do CAR */
+.carcard{border:1px solid var(--line);border-left:5px solid #5b6f8c;border-radius:12px;padding:10px 12px;background:var(--paper);display:flex;flex-direction:column;gap:6px}
+.carcard p{margin:0}
+.carcard dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;margin:0;font-size:14px}
+.carcard dt{color:var(--mute)}.carcard dd{margin:0;overflow-wrap:anywhere}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* tabelas completas */
 details.full{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--paper)}
 details.full summary{font-size:15px}
@@ -300,8 +306,8 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="config.js?v=111"></script>
-<script src="app.js?v=111"></script>
+<script src="config.js?v=112"></script>
+<script src="app.js?v=112"></script>
 <script>
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
 let deferredInstall=null;const ib=document.getElementById("install");

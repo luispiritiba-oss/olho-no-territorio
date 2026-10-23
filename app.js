@@ -167,7 +167,7 @@ const cv=$("map"), ctx=cv.getContext("2d");
 let view=Object.assign({},VIEW_BA), sel=null, R=5, W=0, H=0, DPR=1;
 const LAYERS=[
   {id:"lu",n:"Uso da terra (MapBiomas)",sw:"linear-gradient(90deg,#7dc975 50%,#edde8e 50%)",on:true},
-  {id:"car",n:"Imóveis no CAR",sw:"#7f95b3",on:false},
+  {id:"car",n:"Imóveis do CAR (SICAR)",sw:"#5b6f8c",on:true},
   {id:"min",n:"Mineração (ANM)",sw:STAGE.ex.c,on:true},
   {id:"en",n:"Eólicas e solares",sw:"#1f4fbf",on:true},
   {id:"lt",n:"Linhas e subestações",sw:"#222",on:true},
@@ -192,6 +192,15 @@ const vis=bb=>!(bb.e<view.w||bb.w>view.e||bb.n<view.s||bb.s>view.n);
 function pathRings(c,rings){c.beginPath();for(const r of rings){for(let i=0;i<r.length;i++){const X=px(r[i][0]),Y=py(r[i][1]);i?c.lineTo(X,Y):c.moveTo(X,Y);}c.closePath();}}
 function pathLines(c,paths){c.beginPath();for(const p of paths)for(let i=0;i<p.length;i++){const X=px(p[i][0]),Y=py(p[i][1]);i?c.lineTo(X,Y):c.moveTo(X,Y);}}
 const vw=()=>view.e-view.w;
+const CARWMS_MAX=0.6,CAR_WMS="https://geoserver.car.gov.br/geoserver/sicar/wms";let carWms=null,carWmsKey="",carWmsT=null,carWmsId=0;
+function requestCarWms(){const v={w:view.w,e:view.e,s:view.s,n:view.n};const key=[v.w,v.e,v.s,v.n].map(z=>z.toFixed(4)).join()+"|"+W+"x"+H;if(key===carWmsKey)return;carWmsKey=key;clearTimeout(carWmsT);
+  carWmsT=setTimeout(()=>{const id=++carWmsId,w=Math.min(2048,Math.round(W*DPR)),h=Math.min(2048,Math.round(H*DPR));
+    const url=CAR_WMS+`?service=WMS&version=1.1.1&request=GetMap&layers=sicar:sicar_imoveis_ba&styles=&srs=EPSG:4326&bbox=${v.w},${v.s},${v.e},${v.n}&width=${w}&height=${h}&format=image/png&transparent=true`;
+    const ml=$("mapload");ml.hidden=false;ml.textContent="Carregando os imóveis do CAR…";
+    const im=new Image();im.crossOrigin="anonymous";im.onload=()=>{if(id!==carWmsId)return;try{const cv2=document.createElement("canvas");cv2.width=w;cv2.height=h;const g=cv2.getContext("2d");g.drawImage(im,0,0);const d=g.getImageData(0,0,w,h);const p=d.data;
+        for(let i=0;i<p.length;i+=4){if(!p[i+3])continue;const L=p[i];if(L>150){p[i]=91;p[i+1]=111;p[i+2]=140;p[i+3]=55;}else if(L<60){p[i]=30;p[i+1]=58;p[i+2]=104;p[i+3]=235;}else{p[i]=50;p[i+1]=80;p[i+2]=125;p[i+3]=150;}}
+        g.putImageData(d,0,0);carWms={img:cv2,v};}catch(e){carWms=null;}ml.hidden=true;draw();};
+    im.onerror=()=>{if(id===carWmsId){ml.hidden=true;}};im.src=url;},350);}
 let drawQ=false; function draw(){ if(drawQ)return; drawQ=true; requestAnimationFrame(()=>{drawQ=false; drawNow(ctx,{});}); }
 function drawNow(c,opts){
   const s=opts.scale||DPR; c.setTransform(s,0,0,s,0,0);
@@ -205,7 +214,9 @@ function drawNow(c,opts){
     if(!detail&&overviewImg) c.drawImage(overviewImg,px(-47),py(-8),px(-37)-px(-47),py(-19)-py(-8));
     else for(const t of visTiles()) if(t.luImg) c.drawImage(t.luImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));
     c.restore();}
-  if(on("car")&&detail){c.save();c.globalAlpha=.35;c.imageSmoothingEnabled=false;for(const t of visTiles()) if(t.carImg) c.drawImage(t.carImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));c.restore();}
+  if(on("car")&&detail){const live=vw()<=CARWMS_MAX&&navigator.onLine;if(live&&!opts.noLoad)requestCarWms();
+    if(live&&carWms&&bbOv(carWms.v,view)){c.drawImage(carWms.img,px(carWms.v.w),py(carWms.v.n),px(carWms.v.e)-px(carWms.v.w),py(carWms.v.s)-py(carWms.v.n));}
+    else{c.save();c.globalAlpha=.35;c.imageSmoothingEnabled=false;for(const t of visTiles()) if(t.carImg) c.drawImage(t.carImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));c.restore();}}
   if(on("mu")){c.save();pathRings(c,UF);c.clip("evenodd");c.strokeStyle=css("--mapline");c.lineWidth=detail?1.1:.6;for(const m of MUN){if(!vis(m.bb))continue;pathRings(c,m.r);c.stroke();}c.restore();}
   c.strokeStyle=ink;c.lineWidth=1.8;pathRings(c,UF);c.stroke();
   const fillPoly=(arr,fill,stroke,lw)=>{for(const t of arr){if(!vis(t.bb))continue;pathRings(c,t.r);c.fillStyle=fill;c.fill("evenodd");c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}};
@@ -664,7 +675,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.1.1";
+const VER="1.2.0";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -945,12 +956,15 @@ async function carListPoly(Rg,bb){const feats=[];let start=0,matched=null;const 
     list.push({cod:p.cod_imovel,tipo:p.tipo_imovel,st:p.status_imovel,cond:p.condicao,mun:p.municipio,area:+p.area||0,mf:+p.m_fiscal||0,criado:(p.dat_criacao||"").slice(0,10),atual:(p.data_atualizacao||"").slice(0,10),r:rings,bb:kb,d:0,pct:pts.length?n/pts.length*100:0});}
   list.sort((a,b)=>b.pct-a.pct||b.area-a.area);return {list,matched,trunc:false,when:new Date(),terr:true};}
 const pctTxt=v=>v<1?"<1%":Math.round(v)+"%";
+document.addEventListener("click",async e=>{const b=e.target.closest&&e.target.closest("[data-copy]");if(!b)return;try{await navigator.clipboard.writeText(b.dataset.copy);b.textContent="Código copiado ✓";}catch(_){prompt("Copie o código:",b.dataset.copy);}});
+function carCard(c){return `<div class="carcard"><p class="what">${esc(CTIPO[c.tipo]||c.tipo)} · ${fmtN(c.area,2)} ha · ${fmtN(c.mf,2)} módulos fiscais</p><dl><dt>Código</dt><dd class="mono">${esc(c.cod)}</dd><dt>Município</dt><dd>${esc(c.mun)}</dd><dt>Situação</dt><dd>${esc(CST[c.st]||c.st)}</dd><dt>Condição</dt><dd>${esc(c.cond)}</dd><dt>Cadastrado em</dt><dd>${dBR(c.criado)||"–"}</dd><dt>Atualizado em</dt><dd>${dBR(c.atual)||"–"}</dd>${c.pct!=null&&c.terr?`<dt>Parte do território</dt><dd>${pctTxt(c.pct)}</dd>`:""}</dl><div class="row"><button type="button" class="btn sm" data-copy="${esc(c.cod)}">Copiar código</button><a class="btn sm" href="https://consulta.car.gov.br/" target="_blank" rel="noopener">Abrir Consulta Pública do CAR</a></div></div>`;}
 function carListHTML(L,terr){if(!L)return "";const n=L.list.length;const by={};L.list.forEach(c=>by[c.tipo]=(by[c.tipo]||0)+1);const inPt=L.list.filter(c=>c.d===0);
   let h=`<p style="margin:0"><strong>${fmtN(n)} cadastro${n===1?"":"s"} do CAR</strong> ${terr?"se sobrepõe"+(n===1?"":"m")+" ao território":"encostam no raio"}: ${Object.entries(by).map(([t,k])=>`${k} ${(CTIPO[t]||t).toLowerCase()}`).join(", ")}.${!terr&&inPt.length?` ${inPt.length} cobre${inPt.length>1?"m":""} o ponto escolhido.`:""}</p>`;
+  if(!terr&&inPt.length)h+=`<p class="label" style="margin-top:4px">Imóve${inPt.length>1?"is":"l"} do CAR no ponto escolhido</p>`+inPt.map(carCard).join("");
   if(L.trunc)h+=`<p class="warnbox">O raio tem ${fmtN(L.matched)} cadastros; a lista mostra os ${fmtN(n)} primeiros. Use um raio menor para ver todos.</p>`;
   h+=`<details class="full"><summary>Ver a lista completa (${fmtN(n)})</summary><div class="tscroll"><table class="tbl"><thead><tr><th>${terr?"% do território":"Distância"}</th><th>Código do imóvel</th><th>Tipo</th><th>Município</th><th>Área (ha)</th><th>Módulos fiscais</th><th>Situação</th><th>Condição</th><th>Cadastro</th></tr></thead><tbody>`+
     L.list.map(c=>`<tr><td>${terr?pctTxt(c.pct):c.d===0?"no ponto":c.d==null?"–":fmtKm(c.d)}</td><td class="mono">${esc(c.cod)}</td><td>${esc(CTIPO[c.tipo]||c.tipo)}</td><td>${esc(c.mun)}</td><td>${fmtN(c.area,2)}</td><td>${fmtN(c.mf,2)}</td><td>${esc(CST[c.st]||c.st)}</td><td>${esc(c.cond)}</td><td>${dBR(c.criado)}</td></tr>`).join("")+`</tbody></table></div></details>
-  <p class="hintsmall">O SICAR público não informa o nome dos titulares (proteção de dados). Para controle de sobreposição, anote o nome do titular, se souber, no registro de campo ou no cadastro do território.</p>`;
+  <p class="hintsmall">A Consulta Pública do CAR mostra código, área, município e situação de cada imóvel, mas não o nome do titular: o SICAR guarda esse dado como informação pessoal, acessível só ao próprio titular e aos órgãos ambientais. Para controle de sobreposição, anote o nome do titular, se souber, no registro de campo ou no cadastro do território; para obter o nome oficialmente, peça ao INEMA pela Lei de Acesso à Informação ou por meio da Defensoria ou do Ministério Público.</p>`;
   return h;}
 /* ---------- lista completa de mineração (igual ao SIGMINE) ---------- */
 function minTableHTML(all){if(!all.length)return "";return `<details class="full"><summary>Ver a lista completa (${all.length} processo${all.length>1?"s":""})</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Distância</th><th>Processo</th><th>Número</th><th>Ano</th><th>Área (ha)</th><th>Fase</th><th>Último evento</th><th>Nome</th><th>Substância</th><th>Uso</th><th>UF</th></tr></thead><tbody>`+
