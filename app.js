@@ -183,7 +183,7 @@ const LAYERS=[
 ];
 const on=id=>LAYERS.find(l=>l.id===id).on;
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-function resize(){DPR=Math.min(2,window.devicePixelRatio||1);const r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);fitAspect();draw();}
+function resize(){const ma=document.getElementById("mapattr");if(ma)ma.style.top=Math.max(0,cv.offsetHeight-20)+"px";DPR=Math.min(2,window.devicePixelRatio||1);const r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);fitAspect();draw();}
 function clampView(){const cx=(view.w+view.e)/2,cy=(view.s+view.n)/2;const nx=Math.max(-46.7,Math.min(-37.3,cx)),ny=Math.max(-18.4,Math.min(-8.5,cy));const dx=nx-cx,dy=ny-cy;view.w+=dx;view.e+=dx;view.s+=dy;view.n+=dy;}
 function fitAspect(){const cx=(view.w+view.e)/2,cy=(view.s+view.n)/2;KX=KXf(cy);let gw=(view.e-view.w)*KX,gh=(view.n-view.s)*KY;const ar=W/H;if(gw/gh>ar)gh=gw/ar;else gw=gh*ar;view={w:cx-gw/2/KX,e:cx+gw/2/KX,s:cy-gh/2/KY,n:cy+gh/2/KY};}
 const px=x=>(x-view.w)/(view.e-view.w)*W, py=y=>(view.n-y)/(view.n-view.s)*H;
@@ -202,10 +202,44 @@ function requestCarWms(){const v={w:view.w,e:view.e,s:view.s,n:view.n};const key
         g.putImageData(d,0,0);carWms={img:cv2,v};}catch(e){carWms=null;}ml.hidden=true;draw();};
     im.onerror=()=>{if(id===carWmsId){ml.hidden=true;}};im.src=url;},350);}
 let drawQ=false; function draw(){ if(drawQ)return; drawQ=true; requestAnimationFrame(()=>{drawQ=false; drawNow(ctx,{});}); }
+/* ---------- fundos de mapa ---------- */
+const BASES={padrao:{n:"Simples"},sat:{n:"Satélite",url:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",max:18,attr:"Imagem de satélite: Esri, Vantor, Earthstar Geographics"},
+  terreno:{n:"Terreno",url:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",max:18,attr:"Mapa de terreno: Esri, HERE, Garmin, USGS, IBGE"},
+  branco:{n:"Fundo branco",bg:"#ffffff"}};
+let BASE=(()=>{try{const b=localStorage.getItem("ot_base");return BASES[b]?b:"padrao";}catch(e){return "padrao";}})();
+const BT=new Map();
+function baseTile(url){let t=BT.get(url);if(t)return t;t={ok:false};t.p=new Promise(res=>{const im=new Image();im.crossOrigin="anonymous";im.onload=()=>{t.ok=true;t.img=im;res(t);draw();};im.onerror=()=>{t.err=true;res(t);};im.src=url;});
+  BT.set(url,t);if(BT.size>700){for(const k of BT.keys()){BT.delete(k);if(BT.size<=600)break;}}return t;}
+const m2lat=(y,z)=>{const n=Math.PI-2*Math.PI*y/2**z;return 180/Math.PI*Math.atan(Math.sinh(n));};
+const lat2ty=(lat,z)=>{const r=lat*Math.PI/180;return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*2**z;};
+function baseZoom(v,w,dpr){const B0=BASES[BASE];const ppd=w/(v.e-v.w);return Math.max(4,Math.min(B0.max||18,Math.round(Math.log2(ppd*360/256*Math.min(dpr||1,2)))));}
+function baseTilesFor(v,z){const n=2**z;const x0=Math.floor((v.w+180)/360*n),x1=Math.floor((v.e+180)/360*n),y0=Math.floor(lat2ty(Math.min(85,v.n),z)),y1=Math.floor(lat2ty(Math.max(-85,v.s),z));const out=[];for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)out.push([x,y]);return out;}
+const turl=(u,z,x,y)=>u.replace("{z}",z).replace("{x}",x).replace("{y}",y);
+function drawTilePart(c,img,sx,sy,sw,x,y,z,S){const n=2**z,X0=px(x/n*360-180),X1=px((x+1)/n*360-180);
+  for(let k=0;k<S;k++){const Y0=py(m2lat(y+k/S,z)),Y1=py(m2lat(y+(k+1)/S,z));c.drawImage(img,sx,sy+sw*k/S,sw,sw/S,X0,Y0,X1-X0+0.6,Y1-Y0+0.6);}}
+function drawBase(c,opts){const B0=BASES[BASE];if(!B0.url)return;const z=baseZoom(view,W,opts.scale||DPR);const tl=baseTilesFor(view,z);if(tl.length>400)return;
+  for(const [x,y] of tl){const u=turl(B0.url,z,x,y);const t=opts.noLoad?BT.get(u):baseTile(u);
+    if(t&&t.ok){drawTilePart(c,t.img,0,0,256,x,y,z,8);continue;}
+    for(let d=1;d<=5;d++){const f=2**d,ptx=Math.floor(x/f),pty=Math.floor(y/f),pt=BT.get(turl(B0.url,z-d,ptx,pty));
+      if(pt&&pt.ok){const sw=256/f;drawTilePart(c,pt.img,(x-ptx*f)*sw,(y-pty*f)*sw,sw,x,y,z,4);break;}}}}
+async function preloadBase(v,w,ms){const B0=BASES[BASE];if(!B0.url)return;const z=baseZoom(v,w,1);const tl=baseTilesFor(v,z);if(tl.length>200)return;
+  await Promise.race([Promise.all(tl.map(([x,y])=>baseTile(turl(B0.url,z,x,y)).p)),new Promise(r=>setTimeout(r,ms||9000))]);}
+function setBase(b){BASE=b;try{localStorage.setItem("ot_base",b);}catch(e){}
+  if(b==="sat"||b==="terreno"){const l=LAYERS.find(l=>l.id==="lu");if(l&&l.on){l.on=false;const btn=document.querySelector('.lg[data-id="lu"]');if(btn)btn.setAttribute("aria-pressed","false");}}
+  document.querySelectorAll("#bases button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.b===b)));
+  const a=$("mapattr");if(a){a.textContent=BASES[b].attr||"";a.hidden=!BASES[b].attr;}draw();}
+function initBases(){const box=$("bases");if(!box)return;box.innerHTML=Object.entries(BASES).map(([k,v])=>`<button type="button" data-b="${k}" aria-pressed="${k===BASE}">${v.n}</button>`).join("");
+  box.querySelectorAll("button").forEach(b=>b.onclick=()=>setBase(b.dataset.b));setBase(BASE);}
+/* imagem do CAR (WMS do SICAR) recolorida */
+function carWmsImage(v,w,h){return new Promise((res,rej)=>{const url=CAR_WMS+`?service=WMS&version=1.1.1&request=GetMap&layers=sicar:sicar_imoveis_ba&styles=&srs=EPSG:4326&bbox=${v.w},${v.s},${v.e},${v.n}&width=${w}&height=${h}&format=image/png&transparent=true`;
+  const im=new Image();im.crossOrigin="anonymous";im.onload=()=>{try{const cv2=document.createElement("canvas");cv2.width=w;cv2.height=h;const g=cv2.getContext("2d");g.drawImage(im,0,0);const d=g.getImageData(0,0,w,h);const p=d.data;
+    for(let i=0;i<p.length;i+=4){if(!p[i+3])continue;const L=p[i];if(L>150){p[i]=91;p[i+1]=111;p[i+2]=140;p[i+3]=55;}else if(L<60){p[i]=30;p[i+1]=58;p[i+2]=104;p[i+3]=235;}else{p[i]=50;p[i+1]=80;p[i+2]=125;p[i+3]=150;}}
+    g.putImageData(d,0,0);res({img:cv2,v});}catch(e){rej(e);}};im.onerror=()=>rej(new Error("wms"));im.src=url;});}
 function drawNow(c,opts){
   const s=opts.scale||DPR; c.setTransform(s,0,0,s,0,0);
-  c.fillStyle=opts.bg||css("--mapbg"); c.fillRect(0,0,W,H);
+  c.fillStyle=BASES[BASE].bg||(BASES[BASE].url?"#dfe3da":(opts.bg||css("--mapbg"))); c.fillRect(0,0,W,H);
   if(!B){return;}
+  drawBase(c,opts);
   const detail=vw()<=2.6;
   if(detail&&!opts.noLoad) requestTiles();
   const ink=opts.ink||css("--ink");
@@ -214,7 +248,7 @@ function drawNow(c,opts){
     if(!detail&&overviewImg) c.drawImage(overviewImg,px(-47),py(-8),px(-37)-px(-47),py(-19)-py(-8));
     else for(const t of visTiles()) if(t.luImg) c.drawImage(t.luImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));
     c.restore();}
-  if(on("car")&&detail){const live=vw()<=CARWMS_MAX&&navigator.onLine;if(live&&!opts.noLoad)requestCarWms();
+  if(on("car")&&(detail||opts.forceCar)){const live=opts.forceCar||(vw()<=CARWMS_MAX&&navigator.onLine);if(live&&!opts.noLoad)requestCarWms();
     if(live&&carWms&&bbOv(carWms.v,view)){c.drawImage(carWms.img,px(carWms.v.w),py(carWms.v.n),px(carWms.v.e)-px(carWms.v.w),py(carWms.v.s)-py(carWms.v.n));}
     else{c.save();c.globalAlpha=.35;c.imageSmoothingEnabled=false;for(const t of visTiles()) if(t.carImg) c.drawImage(t.carImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));c.restore();}}
   if(on("mu")){c.save();pathRings(c,UF);c.clip("evenodd");c.strokeStyle=css("--mapline");c.lineWidth=detail?1.1:.6;for(const m of MUN){if(!vis(m.bb))continue;pathRings(c,m.r);c.stroke();}c.restore();}
@@ -269,7 +303,7 @@ $("zall").onclick=()=>{view=Object.assign({},VIEW_BA);fitAspect();draw();};
 function fitTo(bb,m){const w=(bb.e-bb.w),h=(bb.n-bb.s);m=m==null?Math.max(w,h)*0.3+0.01:m;view={w:bb.w-m,e:bb.e+m,s:bb.s-m,n:bb.n+m};fitAspect();}
 function centerOn(x,y,spanDeg){const h=spanDeg/2;view={w:x-h,e:x+h,s:y-h,n:y+h};fitAspect();}
 const lgEl=$("legend");
-LAYERS.forEach(l=>{const b=document.createElement("button");b.type="button";b.className="lg";b.setAttribute("aria-pressed",String(l.on));b.innerHTML=`<span class="sw" style="background:${l.sw}"></span>${l.n}`;b.onclick=()=>{l.on=!l.on;b.setAttribute("aria-pressed",String(l.on));draw();};lgEl.appendChild(b);});
+LAYERS.forEach(l=>{const b=document.createElement("button");b.type="button";b.className="lg";b.setAttribute("aria-pressed",String(l.on));b.dataset.id=l.id;b.innerHTML=`<span class="sw" style="background:${l.sw}"></span>${l.n}`;b.onclick=()=>{l.on=!l.on;b.setAttribute("aria-pressed",String(l.on));draw();};lgEl.appendChild(b);});
 
 /* ---------- location input ---------- */
 const msg=$("msg"), coord=$("coord"), raio=$("raio");
@@ -464,6 +498,40 @@ const SOURCES=[
 $("foot").textContent="Versão de teste em campo. Os dados vêm de bases públicas oficiais e podem estar desatualizados ou incompletos. Estar perto de um processo ou projeto não significa que haverá obra ou mina: cada etapa explica o que já foi autorizado. Nomes de pessoas físicas são ocultados. Os dados pessoais, registros e territórios são enviados para uma pasta restrita da equipe no Google Drive; enquanto não há internet, ficam guardados neste celular. A leitura do relatório em áudio será incluída na fase final.";
 
 /* ---------- PDF ---------- */
+/* ---------- mapa e legenda do relatório ---------- */
+async function snapshotA(bb,selPt){const S=900;const cx=(bb.w+bb.e)/2,cy=(bb.s+bb.n)/2,kx=KXf(cy),span=Math.max((bb.e-bb.w)*kx,(bb.n-bb.s)*KY);
+  const sv={w:cx-span/2/kx,e:cx+span/2/kx,s:cy-span/2/KY,n:cy+span/2/KY};
+  await ensure(sv.w,sv.s,sv.e,sv.n).catch(()=>{});await preloadBase(sv,S,9000).catch(()=>{});
+  let wms=null;if(on("car")&&(sv.e-sv.w)<=CARWMS_MAX*1.5&&navigator.onLine){wms=await Promise.race([carWmsImage(sv,S,S).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),12000))]);}
+  const off=document.createElement("canvas");off.width=S;off.height=S;const c=off.getContext("2d");const keep={view,W,H,sel,carWms};W=S;H=S;view=sv;carWms=wms;
+  if(!selPt)sel=null;let ok=true;
+  try{drawNow(c,{scale:1,bg:"#eef0e8",ink:"#1b211e",noLoad:true,noSel:!selPt,forceCar:!!wms});}catch(e){ok=false;}
+  view=keep.view;W=keep.W;H=keep.H;sel=keep.sel;carWms=keep.carWms;
+  let data;try{data=off.toDataURL("image/jpeg",0.85);}catch(e){/* imagem de fundo sem permissão: refaz sem fundo */const b0=BASE;BASE="padrao";const r=snapshot(bb,selPt);BASE=b0;return {img:r,leg:legendItems(sv,selPt,false)};}
+  return {img:data,leg:legendItems(sv,selPt,!!wms),sv};}
+function legendItems(bb,selPt,carLive){const it=[];const any=(arr)=>arr.some(o=>o.bb&&bbOv(o.bb,bb));
+  if(selPt&&sel)it.push({k:"circ",c:"#0d6a52",n:`Ponto consultado e raio de ${sel.R} km`});
+  if(curT&&bbOv(bboxR(curT.rings),bb))it.push({k:"fill",c:"#d81b60",a:.25,n:"Território analisado"});
+  if(on("car")&&carLive)it.push({k:"fill",c:"#5b6f8c",a:.3,s:"#1e3a68",n:"Imóveis do CAR (SICAR)"});
+  else if(on("car"))it.push({k:"fill",c:"#7f95b3",a:.35,n:"Área com imóvel do CAR declarado"});
+  const tl=tilesFor(bb.w,bb.s,bb.e,bb.n).map(loaded).filter(Boolean);
+  if(on("big")&&tl.some(t=>t.big.some(b=>bbOv(b.bb,bb))))it.push({k:"dash",c:"#37474f",n:"Grande imóvel do CAR (mais de 15 módulos fiscais)"});
+  if(on("pct")){if(CARC.some(c=>c.tipo==="PCT"&&bbOv(c.bb,bb)))it.push({k:"fill",c:"#00897b",a:.3,n:"CEFIR coletivo (povos e comunidades tradicionais)"});if(CARC.some(c=>c.tipo!=="PCT"&&bbOv(c.bb,bb)))it.push({k:"fill",c:"#8d6e63",a:.25,n:"Assentamento no CAR"});}
+  if(on("min")){const sts=new Set();tl.forEach(t=>t.min.forEach(m=>{if(bbOv(m.bb,bb))sts.add(m.st);}));for(const k of ["ex","px","pe","pp","di"])if(sts.has(k))it.push({k:"fill",c:STAGE[k].c,a:.35,s:STAGE[k].c,n:"Mineração: "+STAGE[k].n.toLowerCase()});}
+  if(on("en")){const fs=new Set(EOLP.filter(e=>bbOv(e.bb,bb)).map(e=>e.fase));fs.forEach(f=>it.push({k:"fill",c:enCol(f),a:.4,s:enCol(f),n:"Parque eólico: "+String(f).toLowerCase()}));
+    if(ENP.some(e=>e.tipo==="UFV"&&bbOv(e.bb,bb)))it.push({k:"sq",c:"#f2a900",n:"Usina solar"});if(ENP.some(e=>e.tipo!=="UFV"&&bbOv(e.bb,bb)))it.push({k:"tri",c:"#1f4fbf",n:"Usina eólica (ponto)"});}
+  if(on("lt")){if(any(LTE))it.push({k:"line",c:"#1b211e",n:"Linha de transmissão existente"});if(any(LTP))it.push({k:"dline",c:"#7b2cbf",n:"Linha de transmissão planejada"});if(SE.some(s=>bbOv(s.bb,bb)))it.push({k:"sq",c:"#1b211e",n:"Subestação"});}
+  if(on("uc")&&any(UC))it.push({k:"fill",c:"#2e7d32",a:.2,s:"#2e7d32",n:"Unidade de conservação"});
+  if(on("ti")&&any(TI))it.push({k:"fill",c:"#a0522d",a:.3,s:"#a0522d",n:"Terra indígena"});
+  if(on("qu")&&any(QU))it.push({k:"fill",c:"#7b3fa0",a:.3,s:"#7b3fa0",n:"Território quilombola"});
+  if(on("as")&&any(AS))it.push({k:"fill",c:"#c27c0e",a:.2,s:"#c27c0e",n:"Assentamento (INCRA)"});
+  if(on("sa")&&SA.some(s=>bbOv(s.bb,bb)))it.push({k:"dot",c:"#7a4b2a",n:"Sítio arqueológico"});
+  if(on("ter")&&REGS.some(r=>r.lon>=bb.w&&r.lon<=bb.e&&r.lat>=bb.s&&r.lat<=bb.n))it.push({k:"dot",c:"#d81b60",n:"Registro de campo"});
+  if(on("mu"))it.push({k:"line",c:"#8d958c",n:"Limite municipal"});
+  if(on("lu")){const st=rasterInPoly("lu",[[[bb.w,bb.s],[bb.e,bb.s],[bb.e,bb.n],[bb.w,bb.n],[bb.w,bb.s]]],bb);const tot=st.tot||1;
+    [...st.cnt.entries()].filter(([k])=>k<250).sort((a,b)=>b[1]-a[1]).filter(([,n])=>n/tot>0.01).slice(0,10).forEach(([k,n])=>it.push({k:"fill",c:"#"+LEG[k][1],a:.75,n:"Uso da terra: "+luName(LEG[k][0])+` (${Math.round(n/tot*100)}% do mapa)`}));}
+  return it;}
+const hex2rgb=h=>{h=h.replace("#","");return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];};
 function snapshot(bb,selPt){const S=900,off=document.createElement("canvas");off.width=S;off.height=S;const c=off.getContext("2d");const keep={view,W,H,sel};W=S;H=S;
   const cx=(bb.w+bb.e)/2,cy=(bb.s+bb.n)/2,kx=KXf(cy),span=Math.max((bb.e-bb.w)*kx,(bb.n-bb.s)*KY);view={w:cx-span/2/kx,e:cx+span/2/kx,s:cy-span/2/KY,n:cy+span/2/KY};
   if(!selPt)sel=null;drawNow(c,{scale:1,bg:"#eef0e8",ink:"#1b211e",noLoad:true,noSel:!selPt});view=keep.view;W=keep.W;H=keep.H;sel=keep.sel;return off.toDataURL("image/jpeg",0.85);}
@@ -478,15 +546,29 @@ function pdfDoc(){const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",form
   const IMG2=(img,cap)=>{const h=PW*0.4;need(h+12);doc.addImage(img,"JPEG",M,st.y,PW,h);st.y+=h+2;T(cap,8,"normal",[90,99,93]);};
   const TABLE=(head,body,o={})=>{if(!doc.autoTable){T("(tabela indisponível: o gerador de tabelas não carregou)",8);return;}const cs={};Object.entries(o.colW||{}).forEach(([k,v])=>cs[k]={cellWidth:v});
     doc.autoTable({startY:st.y,head:[head],body,margin:{left:M,right:M,top:16,bottom:14},styles:{fontSize:o.fontSize||7.5,cellPadding:1,overflow:"linebreak",lineColor:[211,216,205],lineWidth:0.1},headStyles:{fillColor:[13,106,82],textColor:255,fontStyle:"bold"},alternateRowStyles:{fillColor:[244,246,241]},columnStyles:cs});st.y=doc.lastAutoTable.finalY+4;};
-  return {doc,T,H2,IMG,IMG2,TABLE,FIN};}
+  const LEGEND=(items,attr)=>{if(!items||!items.length)return;const colW=PW/2,rowH=4.6;need(10);doc.setFont("helvetica","bold");doc.setFontSize(9);doc.setTextColor(27,33,30);doc.text("Legenda do mapa",M,st.y+1);st.y+=4;
+    const rows=Math.ceil(items.length/2);for(let i=0;i<items.length;i++){const col=i<rows?0:1,row=i<rows?i:i-rows;if(col===0&&row>0&&st.y+row*rowH>280){}
+    }
+    let y0=st.y;need(Math.min(rows,40)*rowH+2);y0=st.y;
+    items.forEach((itm,i)=>{const col=i<rows?0:1,row=i<rows?i:i-rows;const x=M+col*colW,y=y0+row*rowH;const [r,g,b]=hex2rgb(itm.c);const a=itm.a==null?1:itm.a;const mix=v=>Math.round(255-(255-v)*a);
+      doc.setLineDashPattern([],0);doc.setLineWidth(0.3);
+      if(itm.k==="fill"){doc.setFillColor(mix(r),mix(g),mix(b));const [sr,sg,sb]=hex2rgb(itm.s||itm.c);doc.setDrawColor(sr,sg,sb);doc.rect(x,y-2.6,7,3.4,"FD");}
+      else if(itm.k==="line"||itm.k==="dline"||itm.k==="dash"){doc.setDrawColor(r,g,b);doc.setLineWidth(itm.k==="dash"?0.4:0.7);if(itm.k!=="line")doc.setLineDashPattern([1.2,0.8],0);doc.line(x,y-0.9,x+7,y-0.9);doc.setLineDashPattern([],0);}
+      else if(itm.k==="sq"){doc.setFillColor(r,g,b);doc.rect(x+2,y-2.4,3,3,"F");}
+      else if(itm.k==="tri"){doc.setFillColor(r,g,b);doc.triangle(x+3.5,y-2.8,x+1.8,y+0.2,x+5.2,y+0.2,"F");}
+      else if(itm.k==="dot"){doc.setFillColor(r,g,b);doc.circle(x+3.5,y-0.9,1.3,"F");}
+      else if(itm.k==="circ"){doc.setDrawColor(r,g,b);doc.setLineDashPattern([1,0.7],0);doc.circle(x+3.5,y-0.9,1.9,"S");doc.setLineDashPattern([],0);doc.setFillColor(r,g,b);doc.circle(x+3.5,y-0.9,0.8,"F");}
+      doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(27,33,30);const L=doc.splitTextToSize(itm.n,colW-11);doc.text(L[0]+(L.length>1?"…":""),x+9,y);});
+    st.y=y0+rows*rowH+2;if(attr){T(attr,7.5,"normal",[90,99,93]);}};
+  return {doc,T,H2,IMG,IMG2,TABLE,FIN,LEGEND};}
 async function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
   pm.textContent="Juntando a série histórica e a lista do CAR…";const wait=(p,ms)=>Promise.race([p||Promise.resolve(null),new Promise(r=>setTimeout(()=>r(null),ms))]);
   const S=await wait(a.seriesP,20000),CL=await wait(a.carP,40000);
-  const {T,H2,IMG,IMG2,TABLE,FIN}=pdfDoc();const P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
+  const {T,H2,IMG,IMG2,TABLE,FIN,LEGEND}=pdfDoc();const P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
   T("Olho no Território",20,"bold");T("Relatório de consulta por ponto · Bahia",10,"normal",[90,99,93]);
   T(`Coordenadas: ${a.y.toFixed(5)}, ${a.x.toFixed(5)}`,11,"bold");
   T(`${a.mun?"Município: "+a.mun+" (BA)":"Município não identificado"}   Raio: ${a.R} km   Data: ${a.when.toLocaleString("pt-BR")}   Origem do ponto: ${sel&&sel.how||""}`,10);
-  const span=Math.max(a.R*3.2,6)/111;IMG(snapshot({w:a.x-span/2,e:a.x+span/2,s:a.y-span/2,n:a.y+span/2},true),"Mapa: o ponto consultado está no centro; o círculo tracejado mostra o raio de busca.");
+  const span=Math.max(a.R*3.2,6)/111;{pm.textContent="Montando o mapa do relatório…";const sn=await snapshotA({w:a.x-span/2,e:a.x+span/2,s:a.y-span/2,n:a.y+span/2},true);IMG(sn.img,"Mapa: o ponto consultado está no centro; o círculo tracejado mostra o raio de busca.");LEGEND(sn.leg,BASES[BASE].attr?"Fundo do mapa: "+BASES[BASE].attr+".":"");}
   H2("Resumo");summary(a).forEach(s=>T(`• ${s.b} ${s.t}`,10.5));
   H2("Mineração (ANM/SIGMINE)");const all=[...a.minIn,...a.minNear];
   if(!all.length)T(`Nenhum processo minerário a até ${a.R} km.`);else{T("Processos por etapa: "+Object.entries(STAGE).filter(([k])=>a.minStage[k]).map(([k,v])=>`${v.n}: ${a.minStage[k]}`).join("; ")+".");
@@ -650,11 +732,11 @@ function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString
  $("tpdf").onclick=()=>makeTerrPDF(r);const s2=$("tsave2");if(s2)s2.onclick=async()=>{await saveTerritory(t,r);renderTerritory(r);};}
 async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
   pm.textContent="Juntando a lista do CAR…";if(r.carP&&!r.carL){const L=await Promise.race([r.carP,new Promise(z=>setTimeout(()=>z(null),40000))]);if(L&&!L.err)r.carL=L;}
-  const t=r.t,{T,H2,IMG,IMG2,TABLE,FIN}=pdfDoc(),P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
+  const t=r.t,{T,H2,IMG,IMG2,TABLE,FIN,LEGEND}=pdfDoc(),P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
   T("Olho no Território",20,"bold");T("Relatório de sobreposições no território da comunidade · Bahia",10,"normal",[90,99,93]);
   T(t.name,14,"bold");T(`${t.tipo||""} · ${fmtN(r.area,1)} ha · ${r.mun.join(", ")||"município não identificado"} (BA)${t.cod?" · "+t.cod:""}`,10);
   T(`Origem do limite: ${t.origem==="SICAR"?"cadastro coletivo no SICAR/CEFIR":t.origem==="desenho"?"desenhado no mapa":"arquivo enviado pela comunidade"} · Data: ${r.when.toLocaleString("pt-BR")}`,9,"normal",[90,99,93]);
-  const bb=bboxR(t.rings),m=Math.max(bb.e-bb.w,bb.n-bb.s)*0.25+0.01;IMG(snapshot({w:bb.w-m,e:bb.e+m,s:bb.s-m,n:bb.n+m},false),"Mapa: o território aparece em rosa. Grandes imóveis do CAR em linha tracejada escura; processos minerários em vermelho e laranja.");
+  const bb=bboxR(t.rings),m=Math.max(bb.e-bb.w,bb.n-bb.s)*0.25+0.01;{pm.textContent="Montando o mapa do relatório…";const sn=await snapshotA({w:bb.w-m,e:bb.e+m,s:bb.s-m,n:bb.n+m},false);IMG(sn.img,"Mapa do território e das sobreposições.");LEGEND(sn.leg,BASES[BASE].attr?"Fundo do mapa: "+BASES[BASE].attr+".":"");}
   H2("CAR / CEFIR");if(t.cod)T(`CAR/CEFIR do território: ${t.cod}${t.dono?" · titular ou responsável informado: "+t.dono:""}`,10,"bold");else if(t.dono)T(`Titular ou responsável informado: ${t.dono}`,10,"bold");T(`${P(r.car.pct)} do território (cerca de ${fmtN(r.car.ha)} ha) tem imóvel rural individual declarado no CAR.`,10.5);
   if(r.carL&&r.carL.list.length){const L={...r.carL,list:r.carL.list.filter(c=>c.cod!==t.cod)};T(`${fmtN(L.list.length)} cadastro(s) do CAR se sobrepõem ao território (consulta ao SICAR em ${r.carL.when.toLocaleString("pt-BR")}). A coluna "% do território" mostra a parte do território coberta por cada um.`,9.5);carTablePDF(TABLE,L,true);}
   r.car.big.forEach(b=>T(`Grande imóvel ${b.cod} (${fmtN(b.area)} ha, ${b.mf} MF): cobre cerca de ${fmtN(b.ha)} ha (${P(b.pct)}) do território.`,9.5));
@@ -675,7 +757,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.2.0";
+const VER="1.3.0";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -978,7 +1060,7 @@ function carTablePDF(TABLE,L,terr){if(!L||!L.list.length)return;TABLE([terr?"% d
 const SAMPLES=[["Fundo de pasto, Pilão Arcado", -43.1144, -10.1696], ["Eólicas, Sento Sé", -41.2, -10.05], ["Ouro, Jacobina", -40.52, -11.18], ["Urânio e ferro, Caetité", -42.48, -14.06], ["Quilombo, Iguape (Cachoeira)", -38.8478, -12.6867], ["Oeste agrícola, São Desidério", -45.7, -12.5]];
 function bootSamples(){const smp=$("samples");SAMPLES.forEach(([n,x,y])=>{const b=document.createElement("button");b.type="button";b.textContent=n;b.onclick=()=>{coord.value=y.toFixed(4)+", "+x.toFixed(4);goLoc(coord.value,"exemplo");};smp.appendChild(b);});}
 window.addEventListener("resize",()=>resize());
-resize();bootSamples();
+resize();bootSamples();initBases();
 loadBase().then(()=>{$("hint").textContent="Toque no mapa ou use sua localização";draw();initDB();window.__ready=true;}).catch(e=>{$("hint").textContent="Não foi possível carregar os dados. Verifique a internet e recarregue a página.";console.error(e);});
 window.__t={analyze,analyzeTerritory,parseLoc,exifGPS,readFiles,ensure,rasterAt,summary,render,renderTerritory,carSection,get B(){return B},get CARC(){return CARC},get MUN(){return MUN},inPoly,utmToLL};
 })();

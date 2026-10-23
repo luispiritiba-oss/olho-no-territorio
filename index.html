@@ -181,6 +181,11 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
 .cwrap .cx{stroke:var(--mute);stroke-width:1;stroke-dasharray:3 3}
 .ctip{position:absolute;top:0;width:170px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:12px;display:flex;flex-direction:column;gap:2px;box-shadow:0 4px 12px rgba(0,0,0,.12);pointer-events:none}
 .ctip span{display:flex;align-items:center;gap:6px}
+.bases{display:flex;gap:6px;padding:10px 14px 0;flex-wrap:wrap}
+.bases::before{content:"Fundo:";font-size:12px;font-weight:700;color:var(--mute);align-self:center;text-transform:uppercase;letter-spacing:.06em}
+.bases button{font-family:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 12px;cursor:pointer;min-height:36px}
+.bases button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.mapattr{position:absolute;right:6px;bottom:auto;font-size:10px;background:rgba(255,255,255,.8);color:#333;padding:1px 6px;border-radius:6px;max-width:70%;text-align:right}
 </style>
 
 </head>
@@ -212,6 +217,8 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
         <button type="button" id="zout" aria-label="Afastar">−</button>
         <button type="button" id="zall" aria-label="Ver a Bahia toda" style="font-size:14px">BA</button>
       </div>
+      <div class="mapattr" id="mapattr" hidden></div>
+      <div class="bases" id="bases" role="group" aria-label="Fundo do mapa"></div>
       <div class="legend" id="legend" aria-label="Camadas do mapa"></div>
     </div>
 
