@@ -635,7 +635,7 @@ function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString
   h+=`<section class="blk"><div class="row">${!t.saved?`<button type="button" class="btn" id="tsave2">Guardar e enviar</button>`:""}<button type="button" class="btn primary" id="tpdf">Gerar relatório do território em PDF</button></div><p class="msg" id="tpdfmsg" role="status"></p></section>
     <section class="blk"><details><summary>Como foi calculado</summary><p class="src">O território foi coberto por ${fmtN(r.samples)} pontos de amostra, um a cada ${r.stepM} m aproximadamente, e cada ponto foi cruzado com as bases. CAR e uso da terra usam células de cerca de 220 m. Áreas e percentuais são aproximados.</p></details></section></div>`;
   out.innerHTML=h;styleBlocks(out);wireChart("chartT",r.series);
-  r.carP.then(L=>{r.carL=L&&!L.err?L:null;const el=$("tcarfull");if(!el)return;el.innerHTML=L&&!L.err?carListHTML(L,true):`<p class="warnbox">${L&&L.err==="offline"?"Sem internet: a lista completa dos cadastros sobrepostos é consultada no SICAR. Abaixo estão os coletivos e os grandes imóveis guardados no celular.":"Não foi possível buscar a lista completa no SICAR agora. Tente de novo mais tarde."}</p>`;if(L&&!L.err){CARLIST=L;draw();}});
+  r.carP.then(L=>{r.carL=L&&!L.err?L:null;const el=$("tcarfull");if(!el)return;el.innerHTML=L&&!L.err?carListHTML({...L,list:L.list.filter(c=>c.cod!==t.cod)},true):`<p class="warnbox">${L&&L.err==="offline"?"Sem internet: a lista completa dos cadastros sobrepostos é consultada no SICAR. Abaixo estão os coletivos e os grandes imóveis guardados no celular.":"Não foi possível buscar a lista completa no SICAR agora. Tente de novo mais tarde."}</p>`;if(L&&!L.err){CARLIST=L;draw();}});
  $("tpdf").onclick=()=>makeTerrPDF(r);const s2=$("tsave2");if(s2)s2.onclick=async()=>{await saveTerritory(t,r);renderTerritory(r);};}
 async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
   pm.textContent="Juntando a lista do CAR…";if(r.carP&&!r.carL){const L=await Promise.race([r.carP,new Promise(z=>setTimeout(()=>z(null),40000))]);if(L&&!L.err)r.carL=L;}
@@ -664,7 +664,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.1.0";
+const VER="1.1.1";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
