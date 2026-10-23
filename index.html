@@ -186,6 +186,8 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
 .bases button{font-family:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 12px;cursor:pointer;min-height:36px}
 .bases button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
 .mapattr{position:absolute;right:6px;bottom:auto;font-size:10px;background:rgba(255,255,255,.8);color:#333;padding:1px 6px;border-radius:6px;max-width:70%;text-align:right}
+.mbyr{display:flex;align-items:center;gap:8px;padding:8px 14px 0;font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.mbyr select{min-height:36px;padding:4px 8px;font-size:14px;text-transform:none;letter-spacing:0}
 </style>
 
 </head>
@@ -313,8 +315,8 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="config.js?v=133"></script>
-<script src="app.js?v=133"></script>
+<script src="config.js?v=140"></script>
+<script src="app.js?v=140"></script>
 <script>
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
 let deferredInstall=null;const ib=document.getElementById("install");

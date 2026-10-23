@@ -244,7 +244,10 @@ function drawNow(c,opts){
   if(detail&&!opts.noLoad) requestTiles();
   const ink=opts.ink||css("--ink");
   // rasters
-  if(on("lu")){c.save();c.globalAlpha=.55;c.imageSmoothingEnabled=false;
+  const mbu=on("lu")&&navigator.onLine&&typeof mbUrlNow==="function"?mbUrlNow(MBYEAR):null;
+  if(on("lu")&&navigator.onLine&&!mbu&&!opts.noLoad&&typeof mbUrl==="function")mbUrl(MBYEAR).catch(()=>{});
+  if(on("lu")&&mbu){c.save();c.globalAlpha=BASES[BASE].url?.75:.6;c.imageSmoothingEnabled=false;drawXYZ(c,mbu,zoomFor(view,W,opts.scale||DPR,14),opts);c.restore();}
+  else if(on("lu")){c.save();c.globalAlpha=.55;c.imageSmoothingEnabled=false;
     if(!detail&&overviewImg) c.drawImage(overviewImg,px(-47),py(-8),px(-37)-px(-47),py(-19)-py(-8));
     else for(const t of visTiles()) if(t.luImg) c.drawImage(t.luImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));
     c.restore();}
@@ -459,8 +462,8 @@ function render(a){
   h+=carSection(a);
   // land use
   h+=`<section class="blk"><h3>Uso e cobertura da terra</h3><div id="lus"><div class="loading" style="padding:8px 0"><span class="spin"></span>Calculando a série histórica 1985–2025…</div></div>`;
-  if(a.lu.tot){if(a.luAt!=null&&a.luAt<250)h+=`<p style="margin:0">No ponto: <strong>${esc(luName(LEG[a.luAt][0]))}</strong></p>`;
-    h+=`<div class="bars">${a.lu.cls.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">Composição em 2025 (MapBiomas Coleção 11, células de cerca de 220 m). Na Caatinga, a formação savânica é a vegetação nativa de porte arbustivo e arbóreo.</p>`;}
+  if(a.lu.tot){if(a.luAt!=null&&a.luAt<250)h+=`<p style="margin:0" id="luat">No ponto: <strong>${esc(luName(LEG[a.luAt][0]))}</strong></p>`;
+    h+=`<div id="lu30"><div class="bars">${a.lu.cls.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">Composição em 2025 pela cópia guardada no app (células de cerca de 220 m).${navigator.onLine?" Buscando os pixels de 30 m na Plataforma MapBiomas…":""}</p></div>`;}
   else h+=`<p class="empty">Sem dados do MapBiomas para este local.</p>`;
   h+=`</section>`;
   h+=`<section class="blk"><div class="row"><button type="button" class="btn primary" id="pdf">Gerar relatório em PDF</button><button type="button" class="btn" id="reg2">Registrar observação aqui</button></div><p class="msg" id="pdfmsg" role="status"></p></section>`;
@@ -470,6 +473,7 @@ function render(a){
   $("reg2").onclick=()=>{$("regPanel").scrollIntoView({behavior:"smooth",block:"start"});const t=$("rtexto");if(t)t.focus();};
   out.querySelectorAll("[data-usepct]").forEach(b=>b.onclick=()=>useCarPct(CARC.find(c=>c.cod===b.dataset.usepct)));
   const my=busy;
+  {const kx=KXf(a.y),dl=a.R/kx,dt=a.R/KY;a.lu30P=Promise.all([lu30((cx,cy)=>Math.hypot((cx-a.x)*kx,(cy-a.y)*KY)<=a.R,{w:a.x-dl,e:a.x+dl,s:a.y-dt,n:a.y+dt},2025),lu30Point(a.x,a.y,2025)]).then(([L,at])=>{a.lu30=L;a.lu30at=at;if(my!==busy)return;const el=$("lu30");if(L&&el){el.innerHTML=lu30HTML(L,null,"do raio");}const pa=$("luat");if(at&&pa)pa.innerHTML=`No ponto: <strong>${esc(mbN(at))}</strong> <span class="hintsmall">(pixel de 30 m, 2025)</span>`;}).catch(()=>{});}
   a.seriesP=seriesCircle(a.x,a.y,a.R).catch(()=>null).then(S=>{a.series=S;if(my!==busy||!$("lus"))return S;$("lus").innerHTML=seriesBlock(S,"chartPt");wireChart("chartPt",S);return S;});
   CARLIST=null;
   if(navigator.onLine){a.carP=carList(a.x,a.y,a.R).then(L=>{a.carL=L;a.car.at=L.list.some(c=>c.d===0)?1:0;a.car.live=true;if(my!==busy||!$("carfull"))return L;const ch=document.querySelector(".rep .chips");if(ch)ch.innerHTML=summary(a).map(s=>`<div class="chip ${s.k}"><b>${s.b}</b><span>${s.t}</span></div>`).join("");const ca=$("carat");if(ca)ca.textContent=a.car.at?"Há imóvel do CAR declarado sobre este ponto (consulta ao SICAR agora).":"Nenhum imóvel do CAR declarado sobre este ponto (consulta ao SICAR agora).";CARLIST=L;$("carfull").innerHTML=carListHTML(L);draw();return L;})
@@ -587,8 +591,10 @@ async function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent=
   if(CL&&CL.list.length){T(`Lista completa: ${fmtN(CL.list.length)} cadastros do CAR encostam no raio (consulta ao SICAR em ${CL.when.toLocaleString("pt-BR")}).${CL.trunc?` O raio tem ${fmtN(CL.matched)} cadastros; a lista traz os primeiros ${fmtN(CL.list.length)}.`:""}`,9.5);carTablePDF(TABLE,CL);}
   else{T("A lista completa do CAR não pôde ser consultada (sem internet ou SICAR fora do ar). Cadastros coletivos e grandes imóveis guardados no aplicativo:",9);a.car.big.forEach(b=>T(`${b.d===0?"NO PONTO":"a "+fmtKm(b.d)} | Grande imóvel | ${fmtN(b.area)} ha (${b.mf} MF) | ${b.cod} | ${b.mun}`,9));}
   T("O CAR é autodeclarado e a maioria dos cadastros aguarda análise do INEMA. Confirme cada caso com a comunidade.",8.5,"italic",[70,78,72]);
-  H2("Uso e cobertura da terra (MapBiomas, série 1985–2025)");seriesPDF(T,IMG2,TABLE,S,"área do raio");
-  if(a.lu.tot){if(a.luAt!=null&&a.luAt<250)T(`No ponto: ${luName(LEG[a.luAt][0])}.`,10,"bold");}
+  H2("Uso e cobertura da terra (MapBiomas)");T("Série histórica 1985–2025:",10,"bold");seriesPDF(T,IMG2,TABLE,S,"área do raio");
+  await Promise.race([a.lu30P||Promise.resolve(),new Promise(z=>setTimeout(z,15000))]);
+  if(a.lu30at)T(`No ponto: ${mbN(a.lu30at)} (pixel de 30 m, 2025).`,10,"bold");else if(a.lu.tot&&a.luAt!=null&&a.luAt<250)T(`No ponto: ${luName(LEG[a.luAt][0])} (célula de cerca de 220 m, 2025).`,10,"bold");
+  if(a.lu30){T(`Composição do raio em ${a.lu30.year} (pixels de cerca de ${a.lu30.pxm} m): `+a.lu30.cls.filter(c=>c.pct>=0.5).slice(0,10).map(c=>`${mbN(c.v)} ${c.pct<1?"<1":Math.round(c.pct)}%`).join("; ")+".",9.5);}
   H2("Fontes");SOURCES.forEach(s=>T("• "+s,8.5));
   H2("Como ler este relatório");T("Este relatório cruza o ponto escolhido com bases públicas oficiais. Estar perto de um processo ou projeto não significa que haverá obra ou mina; a etapa de cada processo indica o que já foi autorizado. As bases podem estar desatualizadas. Para confirmar, procure a ANM, a EPE/ANEEL, o INEMA, a Defensoria ou o Ministério Público. Nomes de pessoas físicas foram ocultados.",9);
   const blob=FIN(),fname=`relatorio-ponto_${a.y.toFixed(4)}_${a.x.toFixed(4)}.pdf`;pm.textContent="Preparando o arquivo…";
@@ -723,11 +729,12 @@ function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString
   const TT=[...r.uc.map(x=>["Unidade de conservação",x]),...r.ti.map(x=>["Terra indígena",x]),...r.qu.map(x=>["Território quilombola",x]),...r.as.map(x=>["Assentamento (INCRA)",x])];
   h+=TT.length?TT.map(([l,x])=>`<div class="item"><span class="tag in">${pf(x.pct)}</span><div><p class="what">${esc(x.name)}</p><p class="meta">${l} · cerca de ${fmtN(x.ha)} ha em comum</p></div></div>`).join(""):`<p class="empty">Nenhuma sobreposição com unidades de conservação, terras indígenas, territórios quilombolas ou assentamentos do INCRA.</p>`;
   h+=`<p class="empty">${r.sa.length?`${r.sa.length} sítio(s) arqueológico(s) dentro do território.`:"Nenhum sítio arqueológico cadastrado dentro do território."}</p></section>`;
-  h+=`<section class="blk"><h3>Uso e cobertura da terra</h3>${seriesBlock(r.series,"chartT")}</section>`;
+  h+=`<section class="blk"><h3>Uso e cobertura da terra</h3><div id="tlu30">${navigator.onLine?`<div class="loading" style="padding:8px 0"><span class="spin"></span>Lendo os pixels de 30 m do MapBiomas…</div>`:""}</div>${seriesBlock(r.series,"chartT")}</section>`;
   if(false)h+=`<section class="blk"><h3>Uso e cobertura da terra</h3><div class="bars">${r.lu.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">MapBiomas 2024.</p></section>`;
   h+=`<section class="blk"><div class="row">${!t.saved?`<button type="button" class="btn" id="tsave2">Guardar e enviar</button>`:""}<button type="button" class="btn primary" id="tpdf">Gerar relatório do território em PDF</button></div><p class="msg" id="tpdfmsg" role="status"></p></section>
     <section class="blk"><details><summary>Como foi calculado</summary><p class="src">O território foi coberto por ${fmtN(r.samples)} pontos de amostra, um a cada ${r.stepM} m aproximadamente, e cada ponto foi cruzado com as bases. CAR e uso da terra usam células de cerca de 220 m. Áreas e percentuais são aproximados.</p></details></section></div>`;
   out.innerHTML=h;styleBlocks(out);wireChart("chartT",r.series);
+  if(!r.lu30P){const bb=bboxR(t.rings);r.lu30P=lu30((x,y)=>inPoly(x,y,t.rings),bb,2025).catch(()=>null);}r.lu30P.then(L=>{r.lu30=L;const el=$("tlu30");if(el)el.innerHTML=L?lu30HTML(L,null,"do território"):"";});
   r.carP.then(L=>{r.carL=L&&!L.err?L:null;const el=$("tcarfull");if(!el)return;el.innerHTML=L&&!L.err?carListHTML({...L,list:L.list.filter(c=>c.cod!==t.cod)},true):`<p class="warnbox">${L&&L.err==="offline"?"Sem internet: a lista completa dos cadastros sobrepostos é consultada no SICAR. Abaixo estão os coletivos e os grandes imóveis guardados no celular.":"Não foi possível buscar a lista completa no SICAR agora. Tente de novo mais tarde."}</p>`;if(L&&!L.err){CARLIST=L;draw();}});
  $("tpdf").onclick=()=>makeTerrPDF(r);const s2=$("tsave2");if(s2)s2.onclick=async()=>{await saveTerritory(t,r);renderTerritory(r);};}
 async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
@@ -751,13 +758,13 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   H2("Áreas protegidas, povos e comunidades");const TT=[...r.uc.map(x=>["Unidade de conservação",x]),...r.ti.map(x=>["Terra indígena",x]),...r.qu.map(x=>["Território quilombola",x]),...r.as.map(x=>["Assentamento (INCRA)",x])];
   if(TT.length)TT.forEach(([l,x])=>T(`${l}: ${x.name} (${P(x.pct)} do território)`,9.5));else T("Nenhuma sobreposição.");
   T(r.sa.length?`${r.sa.length} sítio(s) arqueológico(s) dentro do território.`:"Nenhum sítio arqueológico cadastrado dentro do território.",9.5);
-  H2("Uso e cobertura da terra (MapBiomas, série 1985–2025)");seriesPDF(T,IMG2,TABLE,r.series,"área do território");
+  H2("Uso e cobertura da terra (MapBiomas)");if(r.lu30P)await Promise.race([r.lu30P,new Promise(z=>setTimeout(z,15000))]);if(r.lu30)T(`Composição do território em ${r.lu30.year} (pixels de cerca de ${r.lu30.pxm} m): `+r.lu30.cls.filter(c=>c.pct>=0.5).slice(0,10).map(c=>`${mbN(c.v)} ${c.pct<1?"<1":Math.round(c.pct)}%`).join("; ")+".",9.5);T("Série histórica 1985–2025:",10,"bold");seriesPDF(T,IMG2,TABLE,r.series,"área do território");
   H2("Fontes");SOURCES.forEach(s=>T("• "+s,8.5));T(`Cálculo por amostragem com ${fmtN(r.samples)} pontos dentro do território. Valores aproximados.`,8.5,"italic",[70,78,72]);
   const blob=FIN(),fname=`territorio_${t.name.normalize("NFD").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"comunidade"}.pdf`;pm.textContent="Preparando o arquivo…";
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.3.1";
+const VER="1.4.0";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -1056,11 +1063,44 @@ function minTablePDF(TABLE,all,terr){const body=all.map(m=>{const [nu,an]=String
 function carTablePDF(TABLE,L,terr){if(!L||!L.list.length)return;TABLE([terr?"% do território":"Distância","Código do imóvel","Tipo","Município","Área (ha)","Mód. fiscais","Situação","Condição","Cadastro"],
   L.list.map(c=>[terr?pctTxt(c.pct):c.d===0?"no ponto":c.d==null?"–":fmtKm(c.d),c.cod,CTIPO[c.tipo]||c.tipo,c.mun,fmtN(c.area,2),fmtN(c.mf,2),CST[c.st]||c.st,c.cond,dBR(c.criado)]),{fontSize:6.5,colW:{1:52}});}
 
+/* ---------- MapBiomas em 30 m, lido na hora da Plataforma MapBiomas ---------- */
+const MB_API="https://prd.plataforma.mapbiomas.org/api/v1",MB_H={headers:{"tenant-id":"mapbiomas"}},MB_SK="coverage_coverage-30m-droufo";
+let MB_LEGKEY=null;const MBURL=new Map();
+let MBYEAR=(()=>{try{const y=+localStorage.getItem("ot_mbyear");return y>=1985&&y<=2025?y:2025;}catch(e){return 2025;}})();
+function mbUrl(y){const c=MBURL.get(y);if(c&&Date.now()-c.t<3*3600e3)return c.url?Promise.resolve(c.url):c.p;
+  const p=(async()=>{if(!MB_LEGKEY){const L=await fetch(MB_API+`/brazil/legends?subthemeKey=${MB_SK}&pageSize=50`,MB_H).then(r=>r.json());MB_LEGKEY=((L.legends||[]).find(e=>(e.key||"").startsWith("coverage"))||L.legends[0]).key;}
+    const q=new URLSearchParams([["subthemeKey",MB_SK],["legendKey",MB_LEGKEY],["year",String(y)],...Object.keys(MBC).filter(v=>+v!==27).map(v=>["pixelValue",v])]);
+    const m=await fetch(MB_API+"/brazil/maps/map?"+q,MB_H).then(r=>r.json());if(!m.url)throw new Error("sem endereço do mapa");MBURL.set(y,{url:m.url,t:Date.now()});draw();return m.url;})();
+  MBURL.set(y,{p,t:Date.now()});p.catch(()=>MBURL.delete(y));return p;}
+const mbUrlNow=y=>{const c=MBURL.get(y);return c&&c.url||null;};
+function zoomFor(v,w,dpr,max){const ppd=w/(v.e-v.w);return Math.max(4,Math.min(max,Math.round(Math.log2(ppd*360/256*Math.min(dpr||1,2)))));}
+function drawXYZ(c,tpl,z,opts){const tl=baseTilesFor(view,z);if(tl.length>400)return;
+  for(const [x,y] of tl){const u=turl(tpl,z,x,y);const t=opts.noLoad?BT.get(u):baseTile(u);
+    if(t&&t.ok){drawTilePart(c,t.img,0,0,256,x,y,z,8);continue;}
+    for(let d=1;d<=5;d++){const f=2**d,ptx=Math.floor(x/f),pty=Math.floor(y/f),pt=BT.get(turl(tpl,z-d,ptx,pty));if(pt&&pt.ok){const sw=256/f;drawTilePart(c,pt.img,(x-ptx*f)*sw,(y-pty*f)*sw,sw,x,y,z,4);break;}}}}
+const MBPAL=Object.entries(MBC).filter(([v])=>+v!==27).map(([v,a])=>[+v,parseInt(a[1].slice(0,2),16),parseInt(a[1].slice(2,4),16),parseInt(a[1].slice(4,6),16)]);
+const mbMemo=new Map();function mbCls(r,g,b){const k=(r<<16)|(g<<8)|b;let v=mbMemo.get(k);if(v!==undefined)return v;let best=0,bd=55*55;for(const [pv,R,G,B0] of MBPAL){const d=(r-R)**2+(g-G)**2+(b-B0)**2;if(d<bd){bd=d;best=pv;}}mbMemo.set(k,best);return best;}
+const MBTD=new Map();
+function mbTileData(url){if(MBTD.has(url))return MBTD.get(url);const p=(async()=>{const r=await fetch(url);if(!r.ok)return null;const bm=await createImageBitmap(await r.blob());const cv2=document.createElement("canvas");cv2.width=256;cv2.height=256;const g=cv2.getContext("2d",{willReadFrequently:true});g.drawImage(bm,0,0);const d=g.getImageData(0,0,256,256).data;const o=new Uint8Array(65536);for(let i=0,q=0;q<65536;i+=4,q++)o[q]=d[i+3]<128?0:mbCls(d[i],d[i+1],d[i+2]);return o;})().catch(()=>null);
+  MBTD.set(url,p);if(MBTD.size>300){for(const k of MBTD.keys()){MBTD.delete(k);if(MBTD.size<=200)break;}}return p;}
+async function lu30(test,bb,year){if(!navigator.onLine)return null;const tpl=await mbUrl(year);let z=12;while(z>9&&baseTilesFor(bb,z).length>36)z--;const tl=baseTilesFor(bb,z);const n=2**z;
+  const data=await Promise.all(tl.map(([x,y])=>mbTileData(turl(tpl,z,x,y))));const cnt=new Map();let tot=0;
+  tl.forEach(([x,y],ti)=>{const A=data[ti];if(!A)return;for(let j=0;j<256;j++){const lat=m2lat(y+(j+.5)/256,z);if(lat<bb.s||lat>bb.n)continue;for(let i=0;i<256;i++){const lon=(x*256+i+.5)/(n*256)*360-180;if(lon<bb.w||lon>bb.e)continue;if(!test(lon,lat))continue;const v=A[j*256+i];if(!v)continue;tot++;cnt.set(v,(cnt.get(v)||0)+1);}}});
+  if(!tot)return null;const pxm=Math.round(40075016*Math.cos(((bb.s+bb.n)/2)*Math.PI/180)/(n*256));
+  return {year,z,pxm,tot,cls:[...cnt.entries()].map(([v,k])=>({v,pct:k/tot*100})).sort((a,b)=>b.pct-a.pct)};}
+async function lu30Point(x,y,year){if(!navigator.onLine)return null;const tpl=await mbUrl(year);const z=14,n=2**z;const X=(x+180)/360*n*256,Y=lat2ty(y,z)*256;const A=await mbTileData(turl(tpl,z,Math.floor(X/256),Math.floor(Y/256)));if(!A)return null;const v=A[(Math.floor(Y)%256)*256+(Math.floor(X)%256)];return v||null;}
+const mbN=v=>luName((MBC[v]||["Classe "+v])[0]),mbC=v=>"#"+((MBC[v]||[0,"999999"])[1]);
+function lu30HTML(L,at,area){if(!L)return "";return `${at?`<p style="margin:0">No ponto: <strong>${esc(mbN(at))}</strong> <span class="hintsmall">(pixel de 30 m, ${L.year})</span></p>`:""}
+  <div class="bars">${L.cls.slice(0,8).map(c=>`<div class="bar"><span>${esc(mbN(c.v))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:${mbC(c.v)}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div>
+  <p class="empty" style="font-size:13px">Composição ${area} em ${L.year}, MapBiomas Coleção 11, lida na hora da Plataforma MapBiomas (pixels de cerca de ${L.pxm} m, ${fmtN(L.tot)} pixels). Na Caatinga, a formação savânica é a vegetação nativa de porte arbustivo e arbóreo.</p>`;}
+function initMbYear(){const box=$("bases");if(!box)return;const w=document.createElement("label");w.className="mbyr";w.innerHTML=`Ano do uso da terra <select id="mbyear">${Array.from({length:41},(_,i)=>2025-i).map(y=>`<option${y===MBYEAR?" selected":""}>${y}</option>`).join("")}</select>`;box.after(w);
+  $("mbyear").onchange=e=>{MBYEAR=+e.target.value;try{localStorage.setItem("ot_mbyear",MBYEAR);}catch(_){}const l=LAYERS.find(l=>l.id==="lu");if(!l.on){l.on=true;const b=document.querySelector('.lg[data-id="lu"]');if(b)b.setAttribute("aria-pressed","true");}mbUrl(MBYEAR).catch(()=>{});draw();};}
+
 /* ---------- samples & boot ---------- */
 const SAMPLES=[["Fundo de pasto, Pilão Arcado", -43.1144, -10.1696], ["Eólicas, Sento Sé", -41.2, -10.05], ["Ouro, Jacobina", -40.52, -11.18], ["Urânio e ferro, Caetité", -42.48, -14.06], ["Quilombo, Iguape (Cachoeira)", -38.8478, -12.6867], ["Oeste agrícola, São Desidério", -45.7, -12.5]];
 function bootSamples(){const smp=$("samples");SAMPLES.forEach(([n,x,y])=>{const b=document.createElement("button");b.type="button";b.textContent=n;b.onclick=()=>{coord.value=y.toFixed(4)+", "+x.toFixed(4);goLoc(coord.value,"exemplo");};smp.appendChild(b);});}
 window.addEventListener("resize",()=>resize());
-resize();bootSamples();initBases();
+resize();bootSamples();initBases();initMbYear();
 loadBase().then(()=>{$("hint").textContent="Toque no mapa ou use sua localização";draw();initDB();window.__ready=true;}).catch(e=>{$("hint").textContent="Não foi possível carregar os dados. Verifique a internet e recarregue a página.";console.error(e);});
 window.__t={analyze,analyzeTerritory,parseLoc,exifGPS,readFiles,ensure,rasterAt,summary,render,renderTerritory,carSection,get B(){return B},get CARC(){return CARC},get MUN(){return MUN},inPoly,utmToLL};
 })();
