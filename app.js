@@ -472,13 +472,13 @@ function render(a){
   const my=busy;
   a.seriesP=seriesCircle(a.x,a.y,a.R).catch(()=>null).then(S=>{a.series=S;if(my!==busy||!$("lus"))return S;$("lus").innerHTML=seriesBlock(S,"chartPt");wireChart("chartPt",S);return S;});
   CARLIST=null;
-  if(navigator.onLine){a.carP=carList(a.x,a.y,a.R).then(L=>{a.carL=L;if(my!==busy||!$("carfull"))return L;CARLIST=L;$("carfull").innerHTML=carListHTML(L);draw();return L;})
+  if(navigator.onLine){a.carP=carList(a.x,a.y,a.R).then(L=>{a.carL=L;a.car.at=L.list.some(c=>c.d===0)?1:0;a.car.live=true;if(my!==busy||!$("carfull"))return L;const ch=document.querySelector(".rep .chips");if(ch)ch.innerHTML=summary(a).map(s=>`<div class="chip ${s.k}"><b>${s.b}</b><span>${s.t}</span></div>`).join("");const ca=$("carat");if(ca)ca.textContent=a.car.at?"Há imóvel do CAR declarado sobre este ponto (consulta ao SICAR agora).":"Nenhum imóvel do CAR declarado sobre este ponto (consulta ao SICAR agora).";CARLIST=L;$("carfull").innerHTML=carListHTML(L);draw();return L;})
      .catch(e=>{if(my===busy&&$("carfull"))$("carfull").innerHTML=`<p class="warnbox">Não foi possível buscar a lista completa no SICAR agora (${esc(e.message||"sem resposta")}). Tente de novo mais tarde.</p>`;return null;});}
   else{a.carP=Promise.resolve(null);if($("carfull"))$("carfull").innerHTML=`<p class="warnbox">Sem internet: a lista completa do CAR é consultada no SICAR na hora. Abaixo estão os cadastros coletivos e os grandes imóveis guardados no celular.</p>`;}
 }
 function carSection(a){const C=a.car;let h=`<section class="blk"><h3>CAR / CEFIR</h3>`;
   if(C.at==null&&C.p1==null)return h+`<p class="empty">Sem dados do CAR para este local.</p></section>`;
-  h+=`<p style="margin:0">${C.at?"Há imóvel rural do CAR declarado sobre este ponto.":"Nenhum imóvel rural do CAR declarado sobre este ponto."}</p><div id="carfull"><div class="loading" style="padding:8px 0"><span class="spin"></span>Buscando todos os cadastros do raio no SICAR…</div></div>`;
+  h+=`<p style="margin:0" id="carat">${C.at?"Pela cópia guardada no app, há imóvel do CAR sobre este ponto. Confirmando no SICAR…":"Pela cópia guardada no app, não há imóvel do CAR sobre este ponto. Confirmando no SICAR…"}</p><div id="carfull"><div class="loading" style="padding:8px 0"><span class="spin"></span>Buscando todos os cadastros do raio no SICAR…</div></div>`;
   if(C.p1!=null)h+=`<div class="bars"><div class="bar"><span>Área do raio com CAR</span><div class="track"><div class="fill" style="width:${C.p1}%;background:#7f95b3"></div></div><span class="v">${pf(C.p1)}</span></div></div>`;
   C.coll.forEach(c=>{h+=`<div class="item">${tag(c.d)}<div><p class="what">${c.tipo==="PCT"?"CEFIR coletivo de comunidade tradicional":"Assentamento no CAR"} · ${esc(c.mun)} · ${fmtN(c.area,1)} ha</p>
     <p class="meta">${esc(c.cod)} · ${c.st==="CA"?"cancelado":esc((c.cond||"").toLowerCase())} · cadastrado em ${esc((c.criado||"").split("-").reverse().join("/"))}</p>
@@ -581,7 +581,7 @@ async function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent=
   if(a.se)T(`Subestação mais próxima: ${a.se.name} (${a.se.kv} kV), a ${fmtKm(a.se.d)}.`,9.5);
   H2("Áreas protegidas, povos e comunidades");if(a.terr.length)a.terr.forEach(t=>T(`${t.d===0?"NO PONTO":"a "+fmtKm(t.d)} | ${t.lab}: ${t.name}`,9.5,"bold"));else T(`Nenhuma a até ${a.R} km.${a.terrNearest?` Mais próxima: ${a.terrNearest.name} (${a.terrNearest.lab}), a ${fmtKm(a.terrNearest.d)}.`:""}`);
   T(a.sa.length?`Sítios arqueológicos no raio: ${a.sa.length} (mais próximo: ${a.sa[0].name}, a ${fmtKm(a.sa[0].d)}).`:"Nenhum sítio arqueológico cadastrado no raio.",9.5);
-  H2("CAR / CEFIR (SICAR)");T(a.car.at?"Há imóvel rural do CAR declarado sobre o ponto.":"Nenhum imóvel rural do CAR declarado sobre o ponto.",10,"bold");
+  H2("CAR / CEFIR (SICAR)");T((a.car.at?"Há imóvel rural do CAR declarado sobre o ponto":"Nenhum imóvel rural do CAR declarado sobre o ponto")+(a.car.live?" (consulta ao SICAR no momento do relatório).":" (cópia guardada no app; sem confirmação no SICAR)."),10,"bold");
   if(a.car.p1!=null)T(`${P(a.car.p1)} da área do raio tem imóvel rural do CAR declarado.`,9.5);
   a.car.coll.forEach(c=>T(`${c.d===0?"NO PONTO":"a "+fmtKm(c.d)} | ${c.tipo==="PCT"?"CEFIR coletivo (PCT)":"Assentamento no CAR"} | ${c.mun} | ${fmtN(c.area,1)} ha | ${c.cod} | ${c.st==="CA"?"cancelado":c.cond}${c.ovPct!=null?` | ${P(c.ovPct)} da área também declarada como imóvel individual`:""}`,9));
   if(CL&&CL.list.length){T(`Lista completa: ${fmtN(CL.list.length)} cadastros do CAR encostam no raio (consulta ao SICAR em ${CL.when.toLocaleString("pt-BR")}).${CL.trunc?` O raio tem ${fmtN(CL.matched)} cadastros; a lista traz os primeiros ${fmtN(CL.list.length)}.`:""}`,9.5);carTablePDF(TABLE,CL);}
@@ -757,7 +757,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.3.0";
+const VER="1.3.1";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -857,7 +857,7 @@ function renderCfg(){const c=$("cfg");c.innerHTML=`<label>Endereço do script (t
 /* mapa offline */
 async function cacheAll(){const b=$("offbtn"),m=$("offmsg");if(!("caches" in window)){m.textContent="Este navegador não guarda o mapa para uso sem internet.";return;}
   const urls=[DATA_URL+"base.json",DATA_URL+"lu/overview.png"];B.tiles.forEach(([k,nm,nb,lu])=>{urls.push(DATA_URL+"t/"+k+".json");if(lu)urls.push(DATA_URL+"lu/"+k+".png",DATA_URL+"car/"+k+".png",DATA_URL+"s/"+k+".gz");});urls.push(DATA_URL+"s/index.json");
-  b.disabled=true;let done=0,fail=0;const c=await caches.open("ot-dados-v2");
+  b.disabled=true;let done=0,fail=0;const c=await caches.open("ot-dados-v3");
   const work=async()=>{while(urls.length){const u=urls.shift();try{if(!(await c.match(u))){const r=await fetch(u);if(r.ok)await c.put(u,r);else fail++;}}catch(e){fail++;}done++;m.textContent=`Baixando o mapa: ${Math.round(done/(done+urls.length)*100)}%`;}};
   await Promise.all([work(),work(),work(),work()]);b.disabled=false;
   m.textContent=fail?`Faltaram ${fail} arquivos. Tente de novo com internet melhor.`:"Mapa da Bahia guardado no celular. As consultas funcionam sem internet.";if(!fail)lsSet("ot_offline",new Date().toISOString());}
