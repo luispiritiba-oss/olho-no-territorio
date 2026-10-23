@@ -312,7 +312,7 @@ function showLocHelp(why){const h=$("lochelp");h.hidden=false;h.innerHTML=`<stro
   <li>Toque e segure no ponto azul ou no local desejado até aparecer um alfinete.</li>
   <li>Copie as coordenadas (os números como -10.5445, -40.4047) ou o link de compartilhamento.</li>
   <li>Cole aqui embaixo. A consulta começa sozinha.</li></ol>
-  <span>Também funciona: tirar uma foto com a câmera do celular (com a localização ligada) e escolher "Usar foto do local".</span>`;}
+  <span>Também dá para tocar no ponto direto no mapa, ou buscar pelo número do CAR/CEFIR.</span>`;}
 $("gps").onclick=()=>{
   if(!navigator.geolocation){showLocHelp("Este aparelho não informou a localização.");return;}
   say("Buscando sua localização…");
@@ -327,6 +327,26 @@ function exifGPS(buf){const v=new DataView(buf);if(v.getUint16(0)!==0xFFD8)retur
       const gn=g16(gps);const tags={};for(let i=0;i<gn;i++){const e=gps+2+i*12;const tag=g16(e),cnt=g32(e+4);if(tag===1||tag===3)tags[tag]=String.fromCharCode(v.getUint8(e+8));if(tag===2||tag===4){const p=t+g32(e+8);const r=k=>g32(p+k*8)/(g32(p+k*8+4)||1);tags[tag]=r(0)+r(1)/60+r(2)/3600;}}
       if(tags[2]==null||tags[4]==null)return null;let lat=tags[2],lon=tags[4];if(tags[1]==="S")lat=-lat;if(tags[3]==="W")lon=-lon;return {lat,lon};}
     o+=2+len;}return null;}
+const carCodeNorm=v=>String(v||"").toUpperCase().replace(/[\s.]/g,"").replace(/–|—/g,"-");
+async function carByCode(cod){const f=`cod_imovel='${cod.replace(/'/g,"")}'`;const r=await fetch(CAR_WFS+"&count=5&CQL_FILTER="+encodeURIComponent(f));if(!r.ok)throw new Error("O SICAR respondeu "+r.status+".");const j=await r.json();if(!j.features.length)return null;
+  const ft=j.features[0],p=ft.properties||{},g=ft.geometry,rings=[];if(g&&g.type==="MultiPolygon")g.coordinates.forEach(pl=>pl.forEach(rg=>rings.push(rg.map(q=>[q[0],q[1]]))));else if(g&&g.type==="Polygon")g.coordinates.forEach(rg=>rings.push(rg.map(q=>[q[0],q[1]])));
+  return {cod:p.cod_imovel,tipo:p.tipo_imovel,st:p.status_imovel,cond:p.condicao,mun:p.municipio,area:+p.area||0,mf:+p.m_fiscal||0,rings:cleanRings(rings)};}
+async function goCar(){const m=$("carmsg");const cod=carCodeNorm($("carcod").value);m.className="msg";
+  if(!/^[A-Z]{2}-\d{7}-[0-9A-F]{32}$/.test(cod)){m.textContent="Confira o número. Ele tem o formato BA-2924405-seguido de 32 letras e números (os pontos podem ser omitidos).";m.className="msg err";return;}
+  if(!navigator.onLine){m.textContent="É preciso internet para buscar o perímetro no SICAR.";m.className="msg err";return;}
+  m.textContent="Buscando o perímetro no SICAR…";const b=$("cargo");b.disabled=true;
+  try{const c=await carByCode(cod);if(!c||!c.rings.length){m.textContent="Não encontrei esse número no SICAR da Bahia.";m.className="msg err";}
+    else{m.textContent=`Encontrado: ${CTIPO[c.tipo]||c.tipo} em ${c.mun}, ${fmtN(c.area,1)} ha (${CST[c.st]||c.st}, ${String(c.cond||"").toLowerCase()}). Confira os dados abaixo e toque em Analisar.`;
+      startTerritory({rings:c.rings,name:(c.tipo==="PCT"?"CEFIR coletivo":c.tipo==="AST"?"Assentamento":"Imóvel rural")+" · "+c.mun,cod:c.cod,origem:"SICAR",carInfo:c});}}
+  catch(e){m.textContent="Não foi possível falar com o SICAR agora. Tente de novo em alguns minutos.";m.className="msg err";}b.disabled=false;}
+$("cargo").onclick=goCar;$("carcod").addEventListener("keydown",e=>{if(e.key==="Enter")goCar();});
+function dlText(txt,fname,type){const blob=new Blob([txt],{type});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);}
+function fnameOf(t){return (t.cod||t.name||"perimetro").normalize("NFD").replace(/[^\w-]+/g,"_").replace(/^_|_$/g,"").slice(0,80)||"perimetro";}
+function dlPerimeter(t,fmt){const nm=fnameOf(t);
+  if(fmt==="kml"){const coords=r=>r.map(([x,y])=>x.toFixed(6)+","+y.toFixed(6)+",0").join(" ");
+    const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${esc(t.name||nm)}</name><Placemark><name>${esc(t.name||nm)}</name><description>${esc((t.cod?"CAR/CEFIR "+t.cod+". ":"")+"Gerado pelo app Olho no Território.")}</description><MultiGeometry>${t.rings.map(r=>`<Polygon><outerBoundaryIs><LinearRing><coordinates>${coords(r)}</coordinates></LinearRing></outerBoundaryIs></Polygon>`).join("")}</MultiGeometry></Placemark></Document></kml>`;
+    dlText(kml,nm+".kml","application/vnd.google-earth.kml+xml");}
+  else dlText(JSON.stringify({type:"FeatureCollection",features:[{type:"Feature",properties:{nome:t.name||"",cod_car:t.cod||"",tipo:t.tipo||"",origem:t.origem||""},geometry:{type:"MultiPolygon",coordinates:t.rings.map(r=>[r])}}]}),nm+".geojson","application/geo+json");}
 $("foto").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;
   try{const g=exifGPS(await f.slice(0,262144).arrayBuffer());if(!g||(!g.lat&&!g.lon)){say("Essa foto não tem a localização gravada. No celular, ative a localização na câmera e tire uma foto nova, ou cole as coordenadas.",true);return;}
     coord.value=g.lat.toFixed(6)+", "+g.lon.toFixed(6);goLoc(coord.value,"foto");}
@@ -398,10 +418,10 @@ function render(a){
     h+=`<div class="bars">${a.lu.cls.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">Composição em 2025 (MapBiomas Coleção 11, células de cerca de 220 m). Na Caatinga, a formação savânica é a vegetação nativa de porte arbustivo e arbóreo.</p>`;}
   else h+=`<p class="empty">Sem dados do MapBiomas para este local.</p>`;
   h+=`</section>`;
-  h+=`<section class="blk"><div class="row"><button type="button" class="btn primary" id="pdf">Baixar relatório em PDF</button><button type="button" class="btn" id="reg2">Registrar observação aqui</button><button type="button" class="btn" id="csave">Guardar esta consulta</button></div><p class="msg" id="pdfmsg" role="status"></p></section>`;
+  h+=`<section class="blk"><div class="row"><button type="button" class="btn primary" id="pdf">Gerar relatório em PDF</button><button type="button" class="btn" id="reg2">Registrar observação aqui</button></div><p class="msg" id="pdfmsg" role="status"></p></section>`;
   h+=`<section class="blk"><details><summary>Fontes e datas dos dados</summary><ul class="src">${SOURCES.map(s=>`<li>${s}</li>`).join("")}</ul></details></section></div>`;
   out.innerHTML=h;styleBlocks(out);
-  $("pdf").onclick=()=>makePDF(a);$("csave").onclick=()=>saveConsulta(a);
+  $("pdf").onclick=()=>makePDF(a);
   $("reg2").onclick=()=>{$("regPanel").scrollIntoView({behavior:"smooth",block:"start"});const t=$("rtexto");if(t)t.focus();};
   out.querySelectorAll("[data-usepct]").forEach(b=>b.onclick=()=>useCarPct(CARC.find(c=>c.cod===b.dataset.usepct)));
   const my=busy;
@@ -437,14 +457,14 @@ function snapshot(bb,selPt){const S=900,off=document.createElement("canvas");off
   const cx=(bb.w+bb.e)/2,cy=(bb.s+bb.n)/2,kx=KXf(cy),span=Math.max((bb.e-bb.w)*kx,(bb.n-bb.s)*KY);view={w:cx-span/2/kx,e:cx+span/2/kx,s:cy-span/2/KY,n:cy+span/2/KY};
   if(!selPt)sel=null;drawNow(c,{scale:1,bg:"#eef0e8",ink:"#1b211e",noLoad:true,noSel:!selPt});view=keep.view;W=keep.W;H=keep.H;sel=keep.sel;return off.toDataURL("image/jpeg",0.85);}
 let BANNER=null;fetch("icons/campanha.jpg").then(r=>r.ok?r.blob():null).then(b=>{if(!b)return;const fr=new FileReader();fr.onload=()=>{BANNER=fr.result;};fr.readAsDataURL(b);}).catch(()=>{});
-function pdfDoc(){const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const M=16,PW=210-2*M;const st={y:18};
+function pdfDoc(){const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4",compress:true});const M=16,PW=210-2*M;const st={y:18};
   if(BANNER){try{const w=52,h=w*463/554;doc.addImage(BANNER,"JPEG",(210-w)/2,8,w,h);st.y=8+h+8;}catch(e){}}
   const need=h=>{if(st.y+h>282){doc.addPage();st.y=18;}};
   const T=(s,sz=10,f="normal",col=[27,33,30])=>{doc.setFont("helvetica",f);doc.setFontSize(sz);doc.setTextColor(...col);const L=doc.splitTextToSize(String(s),PW);need(L.length*sz*0.42+1);doc.text(L,M,st.y);st.y+=L.length*sz*0.42+1.5;};
   const H2=s=>{st.y+=3;need(12);doc.setDrawColor(200);doc.line(M,st.y-2,M+PW,st.y-2);T(s,13,"bold",[13,106,82]);};
   const IMG=(img,cap)=>{need(PW*0.62+8);doc.addImage(img,"JPEG",M+PW*0.19,st.y,PW*0.62,PW*0.62);st.y+=PW*0.62+2;T(cap,8,"normal",[90,99,93]);};
   const FIN=(name)=>{const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(120);doc.text(`Olho no Território · versão de teste · página ${i} de ${n}`,M,290);}return doc.output("blob");};
-  const IMG2=(img,cap)=>{const h=PW*0.4;need(h+8);doc.addImage(img,"PNG",M,st.y,PW,h);st.y+=h+2;T(cap,8,"normal",[90,99,93]);};
+  const IMG2=(img,cap)=>{const h=PW*0.4;need(h+12);doc.addImage(img,"JPEG",M,st.y,PW,h);st.y+=h+2;T(cap,8,"normal",[90,99,93]);};
   const TABLE=(head,body,o={})=>{if(!doc.autoTable){T("(tabela indisponível: o gerador de tabelas não carregou)",8);return;}const cs={};Object.entries(o.colW||{}).forEach(([k,v])=>cs[k]={cellWidth:v});
     doc.autoTable({startY:st.y,head:[head],body,margin:{left:M,right:M,top:16,bottom:14},styles:{fontSize:o.fontSize||7.5,cellPadding:1,overflow:"linebreak",lineColor:[211,216,205],lineWidth:0.1},headStyles:{fillColor:[13,106,82],textColor:255,fontStyle:"bold"},alternateRowStyles:{fillColor:[244,246,241]},columnStyles:cs});st.y=doc.lastAutoTable.finalY+4;};
   return {doc,T,H2,IMG,IMG2,TABLE,FIN};}
@@ -478,7 +498,8 @@ async function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent=
   if(a.lu.tot){if(a.luAt!=null&&a.luAt<250)T(`No ponto: ${luName(LEG[a.luAt][0])}.`,10,"bold");}
   H2("Fontes");SOURCES.forEach(s=>T("• "+s,8.5));
   H2("Como ler este relatório");T("Este relatório cruza o ponto escolhido com bases públicas oficiais. Estar perto de um processo ou projeto não significa que haverá obra ou mina; a etapa de cada processo indica o que já foi autorizado. As bases podem estar desatualizadas. Para confirmar, procure a ANM, a EPE/ANEEL, o INEMA, a Defensoria ou o Ministério Público. Nomes de pessoas físicas foram ocultados.",9);
-  pm.textContent="Preparando o arquivo…";savePDF(FIN(),`relatorio-ponto_${a.y.toFixed(4)}_${a.x.toFixed(4)}.pdf`).then(r=>pm.textContent=r).catch(()=>pm.textContent="Não foi possível salvar o PDF.");}
+  const blob=FIN(),fname=`relatorio-ponto_${a.y.toFixed(4)}_${a.x.toFixed(4)}.pdf`;pm.textContent="Preparando o arquivo…";
+  const sent=sendReport(blob,fname,consultaData(a,CL));savePDF(blob,fname).then(async r=>{pm.textContent=r+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 async function savePDF(blob,fname){
   try{const f=new File([blob],fname,{type:"application/pdf"});if(navigator.canShare&&navigator.canShare({files:[f]})&&/Android|iPhone|iPad/i.test(navigator.userAgent)){try{await navigator.share({files:[f],title:fname});return "PDF pronto. Escolha onde guardar ou com quem compartilhar.";}catch(e){if(e&&e.name==="AbortError")return "Compartilhamento cancelado.";}}}catch(e){}
   try{const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);return "PDF baixado. Procure na pasta Downloads do celular.";}catch(e){return "Não foi possível baixar o PDF.";}
@@ -533,13 +554,16 @@ function startTerritory(t){curT=Object.assign({saved:false},t);curT.bb=bboxR(cur
   tformEl.innerHTML=`<label>Nome do território<input id="tnome" value="${esc(t.name||"")}" placeholder="Ex.: Fundo de pasto Lagoa do Mato"></label>
     <label>Tipo de comunidade<select id="ttipo">${TIPOS.map(x=>`<option${x===t.tipo?" selected":""}>${x}</option>`).join("")}</select></label>
     <label>Número do CEFIR / CAR (se houver)<input id="tcod" value="${esc(t.cod||"")}" placeholder="BA-0000000-…"></label>
+    <label>Nome do titular ou responsável pelo CAR (se souber)<input id="tdono" value="${esc(t.dono||"")}" maxlength="160" placeholder="Para controle em caso de sobreposição"></label>
+    <div class="row"><button type="button" class="btn sm" id="tkml">Baixar perímetro (KML)</button><button type="button" class="btn sm" id="tgeo">Baixar perímetro (GeoJSON)</button></div>
     <label class="chk"><input type="checkbox" id="tsave" checked> <span>Guardar este território e enviar para o banco de dados do projeto.</span></label>
     <div class="row"><button type="button" class="btn primary" id="tgo">Analisar território</button><button type="button" class="btn" id="tdiscard">Descartar</button></div>`;
-  $("tgo").onclick=async()=>{curT.name=$("tnome").value.trim()||"Território sem nome";curT.tipo=$("ttipo").value;curT.cod=$("tcod").value.trim();
+  $("tkml").onclick=()=>dlPerimeter(Object.assign({},curT,{name:$("tnome").value.trim()||curT.name}),"kml");$("tgeo").onclick=()=>dlPerimeter(Object.assign({},curT,{name:$("tnome").value.trim()||curT.name}),"geojson");
+  $("tgo").onclick=async()=>{curT.name=$("tnome").value.trim()||"Território sem nome";curT.tipo=$("ttipo").value;curT.cod=$("tcod").value.trim();curT.dono=$("tdono").value.trim();
     const sv=$("tsave"),doSave=sv&&sv.checked;tformEl.hidden=true;$("out").innerHTML=`<div class="loading"><span class="spin"></span>Cruzando as bases com o território…</div>`;$("out").scrollIntoView({behavior:"smooth",block:"start"});
     try{const r=await analyzeTerritory(curT);if(doSave)await saveTerritory(curT,r);renderTerritory(r);}catch(e){$("out").innerHTML=`<div class="placeholder"><p><strong>Não foi possível analisar o território.</strong></p><p>${esc(e.message||"")}</p></div>`;}};
   $("tdiscard").onclick=()=>{curT=null;tformEl.hidden=true;draw();tsay("");};
-  tsay(t.origem==="SICAR"?"Cadastro coletivo carregado. Confira o nome e o tipo de comunidade.":"Território carregado. Confira os dados abaixo.");
+  tsay(t.origem==="SICAR"?"Perímetro do CAR carregado. Confira o nome e o tipo de comunidade.":"Território carregado. Confira os dados abaixo.");
   $("terrPanel").scrollIntoView({behavior:"smooth",block:"nearest"});}
 const bbOv=(a,b)=>!(a.e<b.w||a.w>b.e||a.n<b.s||a.s>b.n);
 function areaHa(rings){let tot=0;const kx=KXf((bboxR(rings).s+bboxR(rings).n)/2);for(const r of rings){let s=0;for(let i=0;i<r.length-1;i++)s+=(r[i][0]*kx)*(r[i+1][1]*KY)-(r[i+1][0]*kx)*(r[i][1]*KY);tot+=s/2;}return Math.abs(tot)*100;}
@@ -569,23 +593,24 @@ async function analyzeTerritory(t){
   const ls=rasterInPoly("lu",Rg,bb);res.lu=[...ls.cnt.entries()].filter(([k])=>k<250).map(([k,n])=>({k,pct:n/ls.tot*100})).sort((a,b)=>b.pct-a.pct);
   const inE=new Set([...mEP.keys()].map(i=>EOLP[i]));
   res.enNear=[...EOLP.filter(e=>!inE.has(e)&&bbOv(e.bb,{w:bb.w-0.12,e:bb.e+0.12,s:bb.s-0.12,n:bb.n+0.12})).map(e=>Object.assign({d:polyPolyD(Rg,e.r)},e)),
-    ...ENP.filter(e=>bbOv(e.bb,{w:bb.w-0.12,e:bb.e+0.12,s:bb.s-0.12,n:bb.n+0.12})).map(e=>Object.assign({d:polyD(e.p[0],e.p[1],Rg)},e))].filter(e=>e.d<=10).sort((a,b)=>a.d-b.d);
+    ...ENP.filter(e=>bbOv(e.bb,{w:bb.w-0.12,e:bb.e+0.12,s:bb.s-0.12,n:bb.n+0.12})).map(e=>Object.assign({d:polyD(e.p[0],e.p[1],Rg)},e))].filter(e=>e.d===0).sort((a,b)=>a.d-b.d);
   const near=(arr)=>{let best=null;const cx=(bb.w+bb.e)/2,cy=(bb.s+bb.n)/2;const cand=arr.map(l=>({l,lb:bbD(l.bb,cx,cy)})).sort((a,b)=>a.lb-b.lb).slice(0,25);for(const {l} of cand){const d=polyLineD(Rg,l.r);if(!best||d<best.d)best=Object.assign({d},l);}return best;};
   res.lte=near(LTE);res.ltp=near(LTP);
   res.sa=SA.filter(s=>bbOv(s.bb,bb)&&inPoly(s.p[0],s.p[1],Rg));res.inBA=[[bb.w,bb.s],[bb.e,bb.n],[(bb.w+bb.e)/2,(bb.s+bb.n)/2]].every(([x,y])=>inBahia(x,y));
   res.series=await seriesPoly(Rg,bb).catch(()=>null);
+  res.carP=navigator.onLine?carListPoly(Rg,bb).catch(e=>({err:e.message||"sem resposta"})):Promise.resolve({err:"offline"});
   return res;}
 function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
-  const ltd=Math.min(r.lte?r.lte.d:1e9,r.ltp?r.ltp.d:1e9);
+  const ltIn=[r.lte,r.ltp].filter(l=>l&&l.d===0);
   const chips=[{k:r.car.pct>=30?"in":(r.car.pct>0?"near":"none"),b:pf(r.car.pct),t:"do território com imóvel individual do CAR declarado"},
     {k:r.min.length?(r.stage.ex||r.stage.px?"in":"near"):"none",b:r.min.length,t:r.min.length?`processo${r.min.length>1?"s":""} de mineração sobre ${pf(r.minPct)} do território`:"sem processo de mineração sobre o território"},
-    {k:r.eolIn.length?"in":(r.enNear.length?"near":"none"),b:r.eolIn.length||r.enNear.length,t:r.eolIn.length?"parque eólico sobre o território":(r.enNear.length?"projeto eólico ou solar a até 10 km":"sem projeto eólico ou solar a até 10 km")},
-    {k:ltd===0?"in":(ltd<=5?"near":"none"),b:fmtKm(ltd),t:ltd===0?"linha de transmissão cruza o território":"até a linha de transmissão mais próxima"}];
+    {k:(r.eolIn.length+r.enNear.length)?"in":"none",b:r.eolIn.length+r.enNear.length,t:(r.eolIn.length+r.enNear.length)?"projeto eólico ou solar dentro do território":"sem projeto eólico ou solar dentro do território"},
+    {k:ltIn.length?"in":"none",b:ltIn.length?"Sim":"Não",t:ltIn.length?"linha de transmissão cruza o território":"nenhuma linha de transmissão cruza o território"}];
   let h=`<div class="rep"><div class="head"><h2>${esc(t.name)}</h2><div style="color:var(--mute);font-size:14px">${esc(t.tipo||"")} · ${fmtN(r.area,1)} ha · ${r.mun.length?esc(r.mun.join(", "))+" (BA)":"município não identificado"}${t.cod?" · "+esc(t.cod):""} · ${d}</div>
     <div style="color:var(--mute);font-size:13px">Origem do limite: ${t.origem==="SICAR"?"cadastro coletivo no SICAR/CEFIR":t.origem==="desenho"?"desenhado no mapa":"arquivo enviado"}${t.saved?" · salvo no projeto":""}</div></div>
     ${r.inBA?"":`<p class="warnbox">Parte do território pode estar fora da Bahia. Os resultados valem só para a parte coberta pelos dados.</p>`}
     <div class="chips">${chips.map(s=>`<div class="chip ${s.k}"><b>${s.b}</b><span>${s.t}</span></div>`).join("")}</div>`;
-  h+=`<section class="blk"><h3>CAR / CEFIR dentro do território</h3><div class="bars"><div class="bar"><span>Com imóvel individual</span><div class="track"><div class="fill" style="width:${r.car.pct}%;background:#7f95b3"></div></div><span class="v">${pf(r.car.pct)}</span></div></div>
+  h+=`<section class="blk"><h3>CAR / CEFIR dentro do território</h3><div id="tcarfull"><div class="loading" style="padding:8px 0"><span class="spin"></span>Buscando no SICAR todos os cadastros que se sobrepõem ao território…</div></div><div class="bars"><div class="bar"><span>Com imóvel individual</span><div class="track"><div class="fill" style="width:${r.car.pct}%;background:#7f95b3"></div></div><span class="v">${pf(r.car.pct)}</span></div></div>
     <p style="margin:0;color:var(--mute);font-size:14px">Cerca de ${fmtN(r.car.ha)} ha do território estão declarados como imóveis rurais individuais no CAR.</p>`;
   r.car.big.forEach(b=>{h+=`<div class="item"><span class="tag in">${pf(b.pct)}</span><div><p class="what">Grande imóvel · ${fmtN(b.area)} ha no total (${String(b.mf).replace(".",",")} módulos fiscais)</p><p class="meta">${esc(b.cod)} · cobre cerca de ${fmtN(b.ha)} ha do território</p></div></div>`;});
   r.car.coll.forEach(c=>{h+=`<div class="item"><span class="tag near">${pf(c.pct)}</span><div><p class="what">${c.tipo==="PCT"?"Outro cadastro coletivo (PCT)":"Assentamento no CAR"}${c.st==="CA"?" · cancelado":""}</p><p class="meta">${esc(c.cod)} · ${esc(c.mun)} · ${fmtN(c.area,1)} ha</p></div></div>`;});
@@ -597,44 +622,49 @@ function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString
     if(r.min.length>8)h+=`<p class="empty">E mais ${r.min.length-8} processos.</p>`;h+=minTableHTML(r.min).replace("<th>Distância</th>","<th>% do território</th>").replace(/<td>(no ponto|[\d,.]+ (m|km))<\/td>/g,"<td>$1</td>");}
   h+=`</section><section class="blk"><h3>Energia</h3>`;
   r.eolIn.forEach(e=>{h+=`<div class="item"><span class="tag in">${pf(e.pct)}</span><div><p class="what">Parque eólico ${esc(e.name)} · ${fmtN(e.mw,1)} MW</p><p class="plain">${esc(enTxt(e.fase))}</p></div></div>`;});
-  r.enNear.slice(0,6).forEach(e=>{h+=`<div class="item">${tag(e.d)}<div><p class="what">${e.tipo==="UFV"?"Usina solar":"Parque eólico"} ${esc(e.name)}${e.mw?" · "+fmtN(e.mw,1)+" MW":""}</p><p class="meta">${esc(enTxt(e.fase))}</p></div></div>`;});
-  if(!r.eolIn.length&&!r.enNear.length)h+=`<p class="empty">Nenhum parque eólico ou usina solar a até 10 km.</p>`;
-  if(r.lte)h+=`<div class="item">${tag(r.lte.d)}<div><p class="what">${r.lte.d===0?"Linha de transmissão cruza o território":"Linha de transmissão existente mais próxima"}</p><p class="meta">${esc(r.lte.name)}</p></div></div>`;
-  if(r.ltp)h+=`<div class="item">${tag(r.ltp.d)}<div><p class="what">Linha planejada mais próxima</p><p class="meta">${esc(r.ltp.name)}${r.ltp.ano?" · previsão "+r.ltp.ano:""}</p></div></div>`;
+  r.enNear.forEach(e=>{h+=`<div class="item"><span class="tag in">Dentro</span><div><p class="what">${e.tipo==="UFV"?"Usina solar":"Parque eólico"} ${esc(e.name)}${e.mw?" · "+fmtN(e.mw,1)+" MW":""}</p><p class="meta">${esc(enTxt(e.fase))}</p></div></div>`;});
+  if(!r.eolIn.length&&!r.enNear.length)h+=`<p class="empty">Nenhum parque eólico ou usina solar dentro do território.</p>`;
+  ltIn.forEach(l=>{h+=`<div class="item"><span class="tag in">Cruza</span><div><p class="what">${l.plan?"Linha de transmissão planejada":"Linha de transmissão existente"}</p><p class="meta">${esc(l.name)}${l.ano?(l.plan?" · previsão ":" · desde ")+l.ano:""}</p></div></div>`;});
+  if(!ltIn.length)h+=`<p class="empty">Nenhuma linha de transmissão, existente ou planejada, cruza o território.</p>`;
   h+=`</section><section class="blk"><h3>Áreas protegidas, povos e comunidades</h3>`;
   const TT=[...r.uc.map(x=>["Unidade de conservação",x]),...r.ti.map(x=>["Terra indígena",x]),...r.qu.map(x=>["Território quilombola",x]),...r.as.map(x=>["Assentamento (INCRA)",x])];
   h+=TT.length?TT.map(([l,x])=>`<div class="item"><span class="tag in">${pf(x.pct)}</span><div><p class="what">${esc(x.name)}</p><p class="meta">${l} · cerca de ${fmtN(x.ha)} ha em comum</p></div></div>`).join(""):`<p class="empty">Nenhuma sobreposição com unidades de conservação, terras indígenas, territórios quilombolas ou assentamentos do INCRA.</p>`;
   h+=`<p class="empty">${r.sa.length?`${r.sa.length} sítio(s) arqueológico(s) dentro do território.`:"Nenhum sítio arqueológico cadastrado dentro do território."}</p></section>`;
   h+=`<section class="blk"><h3>Uso e cobertura da terra</h3>${seriesBlock(r.series,"chartT")}</section>`;
   if(false)h+=`<section class="blk"><h3>Uso e cobertura da terra</h3><div class="bars">${r.lu.slice(0,7).map(c=>`<div class="bar"><span>${esc(luName(LEG[c.k][0]))}</span><div class="track"><div class="fill" style="width:${c.pct}%;background:#${LEG[c.k][1]}"></div></div><span class="v">${pf(c.pct)}</span></div>`).join("")}</div><p class="empty" style="font-size:13px">MapBiomas 2024.</p></section>`;
-  h+=`<section class="blk"><div class="row">${!t.saved?`<button type="button" class="btn" id="tsave2">Guardar e enviar</button>`:""}<button type="button" class="btn primary" id="tpdf">Baixar relatório do território em PDF</button></div><p class="msg" id="tpdfmsg" role="status"></p></section>
+  h+=`<section class="blk"><div class="row">${!t.saved?`<button type="button" class="btn" id="tsave2">Guardar e enviar</button>`:""}<button type="button" class="btn primary" id="tpdf">Gerar relatório do território em PDF</button></div><p class="msg" id="tpdfmsg" role="status"></p></section>
     <section class="blk"><details><summary>Como foi calculado</summary><p class="src">O território foi coberto por ${fmtN(r.samples)} pontos de amostra, um a cada ${r.stepM} m aproximadamente, e cada ponto foi cruzado com as bases. CAR e uso da terra usam células de cerca de 220 m. Áreas e percentuais são aproximados.</p></details></section></div>`;
-  out.innerHTML=h;styleBlocks(out);wireChart("chartT",r.series);$("tpdf").onclick=()=>makeTerrPDF(r);const s2=$("tsave2");if(s2)s2.onclick=async()=>{await saveTerritory(t,r);renderTerritory(r);};}
-function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
+  out.innerHTML=h;styleBlocks(out);wireChart("chartT",r.series);
+  r.carP.then(L=>{r.carL=L&&!L.err?L:null;const el=$("tcarfull");if(!el)return;el.innerHTML=L&&!L.err?carListHTML(L,true):`<p class="warnbox">${L&&L.err==="offline"?"Sem internet: a lista completa dos cadastros sobrepostos é consultada no SICAR. Abaixo estão os coletivos e os grandes imóveis guardados no celular.":"Não foi possível buscar a lista completa no SICAR agora. Tente de novo mais tarde."}</p>`;if(L&&!L.err){CARLIST=L;draw();}});
+ $("tpdf").onclick=()=>makeTerrPDF(r);const s2=$("tsave2");if(s2)s2.onclick=async()=>{await saveTerritory(t,r);renderTerritory(r);};}
+async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textContent="Não foi possível carregar o gerador de PDF.";return;}
+  pm.textContent="Juntando a lista do CAR…";if(r.carP&&!r.carL){const L=await Promise.race([r.carP,new Promise(z=>setTimeout(()=>z(null),40000))]);if(L&&!L.err)r.carL=L;}
   const t=r.t,{T,H2,IMG,IMG2,TABLE,FIN}=pdfDoc(),P=v=>(v<1&&v>0?"menos de 1":v.toFixed(0))+"%";
   T("Olho no Território",20,"bold");T("Relatório de sobreposições no território da comunidade · Bahia",10,"normal",[90,99,93]);
   T(t.name,14,"bold");T(`${t.tipo||""} · ${fmtN(r.area,1)} ha · ${r.mun.join(", ")||"município não identificado"} (BA)${t.cod?" · "+t.cod:""}`,10);
   T(`Origem do limite: ${t.origem==="SICAR"?"cadastro coletivo no SICAR/CEFIR":t.origem==="desenho"?"desenhado no mapa":"arquivo enviado pela comunidade"} · Data: ${r.when.toLocaleString("pt-BR")}`,9,"normal",[90,99,93]);
   const bb=bboxR(t.rings),m=Math.max(bb.e-bb.w,bb.n-bb.s)*0.25+0.01;IMG(snapshot({w:bb.w-m,e:bb.e+m,s:bb.s-m,n:bb.n+m},false),"Mapa: o território aparece em rosa. Grandes imóveis do CAR em linha tracejada escura; processos minerários em vermelho e laranja.");
-  H2("CAR / CEFIR");T(`${P(r.car.pct)} do território (cerca de ${fmtN(r.car.ha)} ha) tem imóvel rural individual declarado no CAR.`,10.5);
+  H2("CAR / CEFIR");if(t.cod)T(`CAR/CEFIR do território: ${t.cod}${t.dono?" · titular ou responsável informado: "+t.dono:""}`,10,"bold");else if(t.dono)T(`Titular ou responsável informado: ${t.dono}`,10,"bold");T(`${P(r.car.pct)} do território (cerca de ${fmtN(r.car.ha)} ha) tem imóvel rural individual declarado no CAR.`,10.5);
+  if(r.carL&&r.carL.list.length){const L={...r.carL,list:r.carL.list.filter(c=>c.cod!==t.cod)};T(`${fmtN(L.list.length)} cadastro(s) do CAR se sobrepõem ao território (consulta ao SICAR em ${r.carL.when.toLocaleString("pt-BR")}). A coluna "% do território" mostra a parte do território coberta por cada um.`,9.5);carTablePDF(TABLE,L,true);}
   r.car.big.forEach(b=>T(`Grande imóvel ${b.cod} (${fmtN(b.area)} ha, ${b.mf} MF): cobre cerca de ${fmtN(b.ha)} ha (${P(b.pct)}) do território.`,9.5));
   r.car.coll.forEach(c=>T(`${c.tipo==="PCT"?"Outro cadastro coletivo":"Assentamento no CAR"} ${c.cod}${c.st==="CA"?" (cancelado)":""}: ${P(c.pct)} do território.`,9.5));
   T("O CAR é autodeclarado e a maioria dos cadastros aguarda análise do INEMA. Confira cada caso com a comunidade.",8.5,"italic",[70,78,72]);
   H2("Mineração (ANM/SIGMINE)");if(!r.min.length)T("Nenhum processo minerário sobre o território.");else{T(`${r.min.length} processo(s) sobre ${P(r.minPct)} do território. `+Object.entries(STAGE).filter(([k])=>r.stage[k]).map(([k,v])=>`${v.n}: ${P(r.stage[k])}`).join("; ")+".",10);
     minTablePDF(TABLE,r.min,true);T("O que significa cada fase:",9.5,"bold");[...new Set(r.min.map(m=>m.fase))].forEach(f=>T(`• ${f}: ${(FASE[f]||{}).txt||""}`,8.5));}
   H2("Energia (EPE/ANEEL)");r.eolIn.forEach(e=>T(`SOBRE O TERRITÓRIO (${P(e.pct)}): ${e.name}, ${fmtN(e.mw,1)} MW, ${e.fase}. ${enTxt(e.fase)}`,9.5));
-  r.enNear.forEach(e=>T(`a ${fmtKm(e.d)}: ${e.tipo==="UFV"?"solar":"eólica"} ${e.name}${e.mw?", "+fmtN(e.mw,1)+" MW":""}, ${e.fase}.`,9.5));
-  if(!r.eolIn.length&&!r.enNear.length)T("Nenhum parque eólico ou usina solar a até 10 km.");
-  if(r.lte)T(`${r.lte.d===0?"Linha de transmissão cruza o território":"Linha de transmissão existente mais próxima, a "+fmtKm(r.lte.d)}: ${r.lte.name}.`,9.5);
-  if(r.ltp)T(`Linha planejada mais próxima, a ${fmtKm(r.ltp.d)}: ${r.ltp.name}.`,9.5);
+  r.enNear.forEach(e=>T(`DENTRO DO TERRITÓRIO: ${e.tipo==="UFV"?"usina solar":"parque eólico"} ${e.name}${e.mw?", "+fmtN(e.mw,1)+" MW":""}, ${e.fase}.`,9.5));
+  if(!r.eolIn.length&&!r.enNear.length)T("Nenhum parque eólico ou usina solar dentro do território.");
+  const ltIn=[r.lte,r.ltp].filter(l=>l&&l.d===0);ltIn.forEach(l=>T(`${l.plan?"Linha planejada":"Linha de transmissão"} cruza o território: ${l.name}.`,9.5));if(!ltIn.length)T("Nenhuma linha de transmissão, existente ou planejada, cruza o território.",9.5);
   H2("Áreas protegidas, povos e comunidades");const TT=[...r.uc.map(x=>["Unidade de conservação",x]),...r.ti.map(x=>["Terra indígena",x]),...r.qu.map(x=>["Território quilombola",x]),...r.as.map(x=>["Assentamento (INCRA)",x])];
   if(TT.length)TT.forEach(([l,x])=>T(`${l}: ${x.name} (${P(x.pct)} do território)`,9.5));else T("Nenhuma sobreposição.");
   T(r.sa.length?`${r.sa.length} sítio(s) arqueológico(s) dentro do território.`:"Nenhum sítio arqueológico cadastrado dentro do território.",9.5);
   H2("Uso e cobertura da terra (MapBiomas, série 1985–2025)");seriesPDF(T,IMG2,TABLE,r.series,"área do território");
   H2("Fontes");SOURCES.forEach(s=>T("• "+s,8.5));T(`Cálculo por amostragem com ${fmtN(r.samples)} pontos dentro do território. Valores aproximados.`,8.5,"italic",[70,78,72]);
-  pm.textContent="Preparando o arquivo…";savePDF(FIN(),`territorio_${t.name.normalize("NFD").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"comunidade"}.pdf`).then(m=>pm.textContent=m).catch(()=>pm.textContent="Não foi possível salvar o PDF.");}
+  const blob=FIN(),fname=`territorio_${t.name.normalize("NFD").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"comunidade"}.pdf`;pm.textContent="Preparando o arquivo…";
+  if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
+  savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.0.0";
+const VER="1.1.0";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -700,11 +730,12 @@ async function dropItem(id){try{await IDB.del(id);}catch(e){}const q=lsGet("ot_f
 function markSent(it){const lid=it.dados&&it.dados.localId;if(!lid)return;const L=it.tipo==="territorio"?TERRS:it.tipo==="registro"?REGS:null;if(!L)return;const o=L.find(x=>x.id===lid);if(o){o.enviado=true;saveLists();}}
 async function sync(){
   if(syncing)return;if(!CFG.endpoint){lastErr="semconfig";return updSync();}if(!navigator.onLine){lastErr="offline";return updSync();}
-  syncing=true;updSync();
+  syncing=true;updSync();let failed=0;
   try{for(const it of await pending()){
       const r=await fetch(CFG.endpoint,{method:"POST",body:JSON.stringify({token:CFG.token,item:it}),redirect:"follow"});
       let j=null;try{j=await r.json();}catch(e){throw new Error("resposta inválida do servidor");}
-      if(j&&j.ok){await dropItem(it.id);markSent(it);lastErr="";}else{lastErr=(j&&j.erro)||"erro no servidor";break;}}}
+      if(j&&j.ok){await dropItem(it.id);markSent(it);}else{failed++;lastErr=(j&&j.erro)||"erro no servidor";if(/chave/.test(lastErr))break;}}
+    if(!failed)lastErr="";}
   catch(e){lastErr=navigator.onLine?(e.message||"falha de conexão"):"offline";}
   syncing=false;updSync();renderTList();renderRList();}
 async function updSync(){const el=$("sync");if(!el)return;pend=(await pending()).length;
@@ -770,6 +801,8 @@ function renderRegForm(){const f=$("rform");
   f.innerHTML=`<div class="tform"><div class="mono">${sel.y.toFixed(5)}, ${sel.x.toFixed(5)}${lastA&&lastA.mun?" · "+esc(lastA.mun):""}${sel.acc?" · precisão "+Math.round(sel.acc)+" m":""}</div>
     <label>O que foi visto<select id="rtipo">${REGTIPOS.map(x=>`<option>${x}</option>`).join("")}</select></label>
     <label>Descrição<textarea id="rtexto" maxlength="2000" placeholder="O que a equipe ou a comunidade relatou neste local"></textarea></label>
+    <label>Nº do CAR envolvido (se houver)<input id="rcar" maxlength="60" placeholder="BA-0000000-…"></label>
+    <label>Nome do titular do CAR (se souber)<input id="rdono" maxlength="160" placeholder="Para controle em caso de sobreposição"></label>
     <div class="row"><label class="btn sm" for="rfoto">Adicionar foto</label><input type="file" id="rfoto" accept="image/*" capture="environment" hidden><span id="rfotoinfo" class="hintsmall"></span></div>
     <img id="rprev" alt="Foto do registro" hidden style="max-width:100%;border-radius:10px">
     <div class="row"><button type="button" class="btn primary" id="rsave">Salvar registro</button></div></div>`;
@@ -778,7 +811,7 @@ function renderRegForm(){const f=$("rform");
   $("rsave").onclick=async()=>{const texto=$("rtexto").value.trim();if(!texto){rsay("Escreva uma descrição curta.",true);return;}
     const b=$("rsave");b.disabled=true;const id=uid();
     const rec={id,lat:+sel.y.toFixed(6),lon:+sel.x.toFixed(6),mun:lastA&&lastA.mun||"",tipo:$("rtipo").value,texto,origem:sel.how||"",precisaoM:sel.acc?Math.round(sel.acc):null,temFoto:!!regFoto,criadoEm:new Date().toISOString(),enviado:false};
-    try{await enqueue("registro",{localId:id,lat:rec.lat,lon:rec.lon,municipio:rec.mun,tipo:rec.tipo,texto,origemPonto:rec.origem,precisaoM:rec.precisaoM,foto:regFoto});
+    try{await enqueue("registro",{localId:id,lat:rec.lat,lon:rec.lon,municipio:rec.mun,tipo:rec.tipo,texto,carEnvolvido:carCodeNorm($("rcar").value),titularCar:$("rdono").value.trim(),origemPonto:rec.origem,precisaoM:rec.precisaoM,foto:regFoto});
       REGS.unshift(rec);saveLists();rsay(CFG.endpoint?"Registro salvo. Enviando para o banco de dados.":"Registro guardado no celular.");renderRegForm();renderRList();draw();}
     catch(e){rsay(e.message||"Não foi possível salvar.",true);}b.disabled=false;};}
 function renderRList(){const l=$("rlist");if(!REGS.length){l.innerHTML=`<p class="hintsmall">Nenhum registro neste celular ainda.</p>`;return;}
@@ -787,15 +820,22 @@ function renderRList(){const l=$("rlist");if(!REGS.length){l.innerHTML=`<p class
     <button type="button" class="btn sm" data-rv="${esc(r.id)}">Ver no mapa</button>${r.enviado?`<button type="button" class="btn sm" data-rd="${esc(r.id)}">Tirar do celular</button>`:""}</div>`).join("");
   l.querySelectorAll("[data-rv]").forEach(b=>b.onclick=()=>{const r=REGS.find(x=>x.id===b.dataset.rv);centerOn(r.lon,r.lat,0.08);choose(r.lon,r.lat,"registro",true);$("map").scrollIntoView({behavior:"smooth",block:"start"});});
   l.querySelectorAll("[data-rd]").forEach(b=>b.onclick=()=>delBtn(b,()=>{REGS=REGS.filter(x=>x.id!==b.dataset.rd);saveLists();renderRList();draw();rsay("Tirado da lista do celular. A cópia enviada continua no banco de dados.");}));}
-async function saveConsulta(a){const m=$("pdfmsg");
-  try{await enqueue("consulta",{lat:+a.y.toFixed(6),lon:+a.x.toFixed(6),raioKm:a.R,municipio:a.mun||"",origemPonto:sel&&sel.how||"",resumo:summary(a).map(s=>s.b+" "+s.t),
-    processosMinerarios:[...a.minIn,...a.minNear].slice(0,40).map(x=>`${x.proc} ${x.subs} – ${x.fase} (${x.d===0?"no ponto":fmtKm(x.d)})`),
+function consultaData(a,CL){CL=CL||a.carL;return {tipoRelatorio:"ponto",lat:+a.y.toFixed(6),lon:+a.x.toFixed(6),raioKm:a.R,municipio:a.mun||"",origemPonto:sel&&sel.how||"",resumo:summary(a).map(s=>s.b+" "+s.t),
+    processosMinerarios:[...a.minIn,...a.minNear].slice(0,60).map(x=>`${x.proc} ${x.subs} – ${x.fase} (${x.d===0?"no ponto":fmtKm(x.d)})`),
     energia:a.enR.map(e=>`${e.name} (${e.fase}, ${fmtKm(e.d)})`),areasProtegidas:a.terr.map(t=>`${t.lab}: ${t.name} (${t.d===0?"no ponto":fmtKm(t.d)})`),
     car:{noPonto:!!a.car.at,pctRaio:a.car.p1!=null?Math.round(a.car.p1):null,coletivos:a.car.coll.map(c=>c.cod),grandes:a.car.big.length},
     usoNoPonto:a.luAt!=null&&a.luAt<250?luName(LEG[a.luAt][0]):"",
-    carCompleto:a.carL?{total:a.carL.list.length,noPonto:a.carL.list.filter(c=>c.d===0).map(c=>c.cod),codigos:a.carL.list.slice(0,300).map(c=>c.cod+" ("+c.tipo+", "+Math.round(c.area)+" ha)")}:null,
-    serie:a.series?a.series.byYear.filter(b=>b.yr%5===0).map(b=>`${b.yr}: nativa ${Math.round(b.g.nat)}%, agropecuária ${Math.round(b.g.agr)}%`):null});m.textContent="Consulta guardada.";}
-  catch(e){m.textContent=e.message||"Não foi possível guardar.";}}
+    carCompleto:CL&&CL.list?{total:CL.list.length,noPonto:CL.list.filter(c=>c.d===0).map(c=>c.cod),codigos:CL.list.slice(0,400).map(c=>c.cod+" ("+c.tipo+", "+Math.round(c.area)+" ha)")}:null,
+    serie:a.series?a.series.byYear.filter(b=>b.yr%5===0).map(b=>`${b.yr}: nativa ${Math.round(b.g.nat)}%, agropecuária ${Math.round(b.g.agr)}%`):null};}
+function terrSummary(r){return [`CAR individual: ${Math.round(r.car.pct)}% do território`,`Mineração: ${r.min.length} processo(s) sobre ${Math.round(r.minPct)}%`,
+  `Energia dentro: ${r.eolIn.length+r.enNear.length}`,`Linha de transmissão cruza: ${[r.lte,r.ltp].some(l=>l&&l.d===0)?"sim":"não"}`,
+  `Áreas protegidas/territórios sobrepostos: ${[...r.uc,...r.ti,...r.qu,...r.as].map(x=>x.name+" ("+Math.round(x.pct)+"%)").join("; ")||"nenhum"}`,
+  ...(r.series?[`Vegetação nativa: ${Math.round(r.series.byYear[0].g.nat)}% em ${r.series.years[0]} e ${Math.round(r.series.byYear[r.series.byYear.length-1].g.nat)}% em ${r.series.years[r.series.years.length-1]}`]:[])];}
+function blobToDataURL(b){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(fr.error);fr.readAsDataURL(b);});}
+async function sendReport(blob,fname,dados){
+  try{const pdf=await blobToDataURL(blob);await enqueue("relatorio",Object.assign({nomeArquivo:fname,pdf},dados));
+    return CFG.endpoint?(navigator.onLine?"O relatório está sendo enviado para a pasta do projeto no Drive.":"Sem internet: o relatório foi guardado e vai para a pasta do Drive quando a internet voltar."):"O envio para o Drive ainda não foi configurado; o relatório ficou guardado no celular.";}
+  catch(e){return "Não foi possível guardar o relatório para envio ("+(e.message||"erro")+").";}}
 async function initDB(){renderWho();renderTList();renderRegForm();renderRList();renderCfg();updSync();sync();
   $("offbtn").onclick=cacheAll;const off=lsGet("ot_offline");if(off)$("offmsg").textContent="Mapa guardado no celular em "+new Date(off).toLocaleDateString("pt-BR")+".";
   if(!PESSOA)showGate(false);}
@@ -804,7 +844,7 @@ async function initDB(){renderWho();renderTList();renderRegForm();renderRList();
 const MBC={"3": ["Formação Florestal", "1f8d49", "nat"], "6": ["Floresta Alagável", "007785", "nat"], "4": ["Formação Savânica", "7dc975", "nat"], "7": ["Savana Alagada (beta)", "228c70", "nat"], "5": ["Mangue", "04381d", "nat"], "49": ["Restinga Arbórea", "02d659", "nat"], "12": ["Formação Campestre", "d6bc74", "nat"], "77": ["Formação Herbáceo Arbustiva (beta)", "86b074", "nat"], "11": ["Campo Alagado e Área Pantanosa", "519799", "nat"], "84": ["Marisma (beta)", "81dbbf", "nat"], "50": ["Restinga Herbácea ou Arbustiva", "ffaa5f", "nat"], "32": ["Apicum", "fc8114", "nat"], "29": ["Afloramento Rochoso", "ad5100", "nat"], "15": ["Pastagem", "edde8e", "agr"], "39": ["Soja", "f5b3c8", "agr"], "20": ["Cana", "db7093", "agr"], "40": ["Arroz", "c71585", "agr"], "62": ["Algodão (beta)", "ff69b4", "agr"], "41": ["Outras Lavouras Temporárias", "f54ca9", "agr"], "46": ["Café", "d68fe2", "agr"], "47": ["Citrus", "9932cc", "agr"], "35": ["Dendê", "9065d0", "agr"], "48": ["Outras Lavouras Perenes", "e6ccff", "agr"], "9": ["Silvicultura", "7a5900", "agr"], "21": ["Mosaico de Usos", "ffefc3", "agr"], "23": ["Praia, Duna e Areal", "ffa07a", "nv"], "24": ["Área Urbanizada", "d4271e", "nv"], "30": ["Mineração", "9c0027", "nv"], "75": ["Usina Fotovoltaica", "757272", "nv"], "91": ["Parque eólico (beta)", "403d3e", "nv"], "25": ["Outras Áreas não Vegetadas", "db4d4f", "nv"], "33": ["Rio, Lago e Oceano", "2532e4", "agua"], "31": ["Aquicultura", "091077", "agua"]};
 const mbName=c=>(MBC[c]||["Outra classe ("+c+")"])[0];
 /* 4 grupos para o gráfico – cores da paleta categórica validada (slots 1–4) */
-const GRP=[{id:"agua",n:"Água",c:"#2a78d6",cd:"#3987e5"},{id:"nv",n:"Área não vegetada (cidade, mineração, solar e outras)",s:"Área não vegetada",c:"#eb6834",cd:"#d95926"},
+const GRP=[{id:"agua",n:"Água",s:"Água",c:"#2a78d6",cd:"#3987e5"},{id:"nv",n:"Área não vegetada (cidade, mineração, solar e outras)",s:"Área não vegetada",c:"#eb6834",cd:"#d95926"},
  {id:"nat",n:"Vegetação nativa (floresta, caatinga, cerrado, campos)",s:"Vegetação nativa",c:"#1baf7a",cd:"#199e70"},{id:"agr",n:"Agropecuária (pasto, lavouras, silvicultura, mosaico)",s:"Agropecuária",c:"#eda100",cd:"#c98500"}];
 const dark=()=>matchMedia("(prefers-color-scheme: dark)").matches;
 let SIDX=null;const SC=new Map();
@@ -864,9 +904,10 @@ function chartPNG(S){const c=document.createElement("canvas");const W0=1400,H0=5
   for(const v of [0,25,50,75,100]){g.beginPath();g.moveTo(ml,Y(v));g.lineTo(ml+pw,Y(v));g.stroke();g.textAlign="right";g.fillText(v+"%",ml-10,Y(v)+7);}
   g.textAlign="center";S.years.forEach((y,i)=>{if(y%5===0)g.fillText(y,X(i),H0-14);});
   const ends=[];for(const G of GRP){g.strokeStyle=G.c;g.lineWidth=4;g.lineJoin="round";g.beginPath();S.byYear.forEach((b,i)=>{const yy=Y(b.g[G.id]);i?g.lineTo(X(i),yy):g.moveTo(X(i),yy);});g.stroke();
-    const lv=S.byYear[n-1].g[G.id];g.fillStyle=G.c;g.beginPath();g.arc(X(n-1),Y(lv),7,0,7);g.fill();ends.push({y:Y(lv),t:`${G.s} ${pf(lv)}`});}
-  ends.sort((a,b)=>a.y-b.y);for(let i=1;i<ends.length;i++)if(ends[i].y-ends[i-1].y<26)ends[i].y=ends[i-1].y+26;
-  g.fillStyle="#1b211e";g.textAlign="left";g.font="22px Helvetica, Arial";ends.forEach(e=>g.fillText(e.t,X(n-1)+16,e.y+7));return c.toDataURL("image/png");}
+    const lv=S.byYear[n-1].g[G.id];g.fillStyle=G.c;g.beginPath();g.arc(X(n-1),Y(lv),7,0,7);g.fill();ends.push({y:Y(lv),t:`${G.s} ${pf(lv)}`,c:G.c});}
+  ends.sort((a,b)=>a.y-b.y);for(let i=1;i<ends.length;i++)if(ends[i].y-ends[i-1].y<28)ends[i].y=ends[i-1].y+28;
+  for(let i=ends.length-1;i>=0;i--){const lim=H0-mb-4-(ends.length-1-i)*28;if(ends[i].y>lim)ends[i].y=lim;if(i<ends.length-1&&ends[i+1].y-ends[i].y<28)ends[i].y=ends[i+1].y-28;}
+  g.textAlign="left";g.font="bold 22px Helvetica, Arial";ends.forEach(e=>{g.fillStyle=e.c;g.fillRect(X(n-1)+14,e.y-3,14,6);g.fillStyle="#1b211e";g.fillText(e.t,X(n-1)+34,e.y+7);});return c.toDataURL("image/jpeg",0.9);}
 function seriesPDF(T,IMG2,TABLE,S,area){if(!S){T("Série histórica do MapBiomas indisponível para este local.",9.5);return;}
   const f=S.byYear[0],l=S.byYear[S.byYear.length-1];
   T(`De ${f.yr} a ${l.yr}, a vegetação nativa passou de ${pf(f.g.nat)} para ${pf(l.g.nat)} da ${area}, e a agropecuária de ${pf(f.g.agr)} para ${pf(l.g.agr)}.`,10);
@@ -892,20 +933,32 @@ async function carList(x,y,R){const key=[x.toFixed(5),y.toFixed(5),R].join();if(
     .sort((a,b)=>(a.d??1e9)-(b.d??1e9)||b.area-a.area);
   const res={list,matched,trunc:matched!=null&&matched>list.length,when:new Date()};carCache.set(key,res);return res;}
 const dBR=s=>s?s.split("-").reverse().join("/"):"";
-function carListHTML(L){if(!L)return "";const n=L.list.length;const by={};L.list.forEach(c=>by[c.tipo]=(by[c.tipo]||0)+1);const inPt=L.list.filter(c=>c.d===0);
-  let h=`<p style="margin:0"><strong>${fmtN(n)} cadastro${n===1?"":"s"} do CAR</strong> encostam no raio: ${Object.entries(by).map(([t,k])=>`${k} ${(CTIPO[t]||t).toLowerCase()}`).join(", ")}.${inPt.length?` ${inPt.length} cobre${inPt.length>1?"m":""} o ponto escolhido.`:""}</p>`;
+async function carListPoly(Rg,bb){const feats=[];let start=0,matched=null;const f=`BBOX(geo_area_imovel,${bb.w},${bb.s},${bb.e},${bb.n},'EPSG:4326')`;
+  while(true){const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),60000);
+    const r=await fetch(CAR_WFS+`&count=2000&startIndex=${start}&CQL_FILTER=`+encodeURIComponent(f),{signal:ctl.signal});clearTimeout(to);
+    if(!r.ok)throw new Error("SICAR respondeu "+r.status);const j=await r.json();matched=j.numberMatched;feats.push(...j.features);if(j.features.length<2000||feats.length>=12000)break;start+=2000;}
+  const kx=KXf((bb.s+bb.n)/2),wkm=Math.max(.05,(bb.e-bb.w)*kx),hkm=Math.max(.05,(bb.n-bb.s)*KY),step=Math.max(0.01,Math.sqrt(wkm*hkm/6000)),sx=step/kx,sy=step/KY,pts=[];
+  for(let y=bb.s+sy/2;y<bb.n;y+=sy)for(let x=bb.w+sx/2;x<bb.e;x+=sx)if(inPoly(x,y,Rg))pts.push([x,y]);
+  const list=[];for(const ft of feats){const p=ft.properties||{};const rings=[];const g=ft.geometry;if(g&&g.type==="MultiPolygon")g.coordinates.forEach(pl=>pl.forEach(rg=>rings.push(rg)));else if(g&&g.type==="Polygon")g.coordinates.forEach(rg=>rings.push(rg));if(!rings.length)continue;
+    const kb=bboxR(rings);let n=0;for(const [x,y] of pts){if(x<kb.w||x>kb.e||y<kb.s||y>kb.n)continue;if(inPoly(x,y,rings))n++;}
+    if(!n&&polyPolyD(Rg,rings)>0)continue;
+    list.push({cod:p.cod_imovel,tipo:p.tipo_imovel,st:p.status_imovel,cond:p.condicao,mun:p.municipio,area:+p.area||0,mf:+p.m_fiscal||0,criado:(p.dat_criacao||"").slice(0,10),atual:(p.data_atualizacao||"").slice(0,10),r:rings,bb:kb,d:0,pct:pts.length?n/pts.length*100:0});}
+  list.sort((a,b)=>b.pct-a.pct||b.area-a.area);return {list,matched,trunc:false,when:new Date(),terr:true};}
+const pctTxt=v=>v<1?"<1%":Math.round(v)+"%";
+function carListHTML(L,terr){if(!L)return "";const n=L.list.length;const by={};L.list.forEach(c=>by[c.tipo]=(by[c.tipo]||0)+1);const inPt=L.list.filter(c=>c.d===0);
+  let h=`<p style="margin:0"><strong>${fmtN(n)} cadastro${n===1?"":"s"} do CAR</strong> ${terr?"se sobrepõe"+(n===1?"":"m")+" ao território":"encostam no raio"}: ${Object.entries(by).map(([t,k])=>`${k} ${(CTIPO[t]||t).toLowerCase()}`).join(", ")}.${!terr&&inPt.length?` ${inPt.length} cobre${inPt.length>1?"m":""} o ponto escolhido.`:""}</p>`;
   if(L.trunc)h+=`<p class="warnbox">O raio tem ${fmtN(L.matched)} cadastros; a lista mostra os ${fmtN(n)} primeiros. Use um raio menor para ver todos.</p>`;
-  h+=`<details class="full"><summary>Ver a lista completa (${fmtN(n)})</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Distância</th><th>Código do imóvel</th><th>Tipo</th><th>Município</th><th>Área (ha)</th><th>Módulos fiscais</th><th>Situação</th><th>Condição</th><th>Cadastro</th></tr></thead><tbody>`+
-    L.list.map(c=>`<tr><td>${c.d===0?"no ponto":c.d==null?"–":fmtKm(c.d)}</td><td class="mono">${esc(c.cod)}</td><td>${esc(CTIPO[c.tipo]||c.tipo)}</td><td>${esc(c.mun)}</td><td>${fmtN(c.area,2)}</td><td>${fmtN(c.mf,2)}</td><td>${esc(CST[c.st]||c.st)}</td><td>${esc(c.cond)}</td><td>${dBR(c.criado)}</td></tr>`).join("")+`</tbody></table></div></details>`;
+  h+=`<details class="full"><summary>Ver a lista completa (${fmtN(n)})</summary><div class="tscroll"><table class="tbl"><thead><tr><th>${terr?"% do território":"Distância"}</th><th>Código do imóvel</th><th>Tipo</th><th>Município</th><th>Área (ha)</th><th>Módulos fiscais</th><th>Situação</th><th>Condição</th><th>Cadastro</th></tr></thead><tbody>`+
+    L.list.map(c=>`<tr><td>${terr?pctTxt(c.pct):c.d===0?"no ponto":c.d==null?"–":fmtKm(c.d)}</td><td class="mono">${esc(c.cod)}</td><td>${esc(CTIPO[c.tipo]||c.tipo)}</td><td>${esc(c.mun)}</td><td>${fmtN(c.area,2)}</td><td>${fmtN(c.mf,2)}</td><td>${esc(CST[c.st]||c.st)}</td><td>${esc(c.cond)}</td><td>${dBR(c.criado)}</td></tr>`).join("")+`</tbody></table></div></details>
+  <p class="hintsmall">O SICAR público não informa o nome dos titulares (proteção de dados). Para controle de sobreposição, anote o nome do titular, se souber, no registro de campo ou no cadastro do território.</p>`;
   return h;}
-
 /* ---------- lista completa de mineração (igual ao SIGMINE) ---------- */
 function minTableHTML(all){if(!all.length)return "";return `<details class="full"><summary>Ver a lista completa (${all.length} processo${all.length>1?"s":""})</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Distância</th><th>Processo</th><th>Número</th><th>Ano</th><th>Área (ha)</th><th>Fase</th><th>Último evento</th><th>Nome</th><th>Substância</th><th>Uso</th><th>UF</th></tr></thead><tbody>`+
   all.map(m=>{const [nu,an]=String(m.proc).split("/");return `<tr><td>${m.d===0?"no ponto":fmtKm(m.d)}</td><td class="mono">${esc(m.proc)}</td><td>${esc(nu)}</td><td>${esc(an)}</td><td>${fmtN(m.area,2)}</td><td>${esc(m.fase)}</td><td>${esc(m.ev)}</td><td>${esc(titular(m.nome))}</td><td>${esc(m.subs)}</td><td>${esc(m.uso)}</td><td>BA</td></tr>`;}).join("")+`</tbody></table></div></details>`;}
 function minTablePDF(TABLE,all,terr){const body=all.map(m=>{const [nu,an]=String(m.proc).split("/");return [terr?(m.pct<1?"<1%":Math.round(m.pct)+"%"):(m.d===0?"no ponto":fmtKm(m.d)),m.proc,nu,an,fmtN(m.area,2),m.fase,m.ev,titular(m.nome),m.subs,m.uso,"BA"];});
   TABLE([terr?"% do território":"Distância","Processo","Número","Ano","Área (ha)","Fase","Último evento","Nome","Substância","Uso","UF"],body,{fontSize:6.5,landscapeHint:true,colW:{6:38,7:30}});}
-function carTablePDF(TABLE,L){if(!L||!L.list.length)return;TABLE(["Distância","Código do imóvel","Tipo","Município","Área (ha)","Mód. fiscais","Situação","Condição","Cadastro"],
-  L.list.map(c=>[c.d===0?"no ponto":c.d==null?"–":fmtKm(c.d),c.cod,CTIPO[c.tipo]||c.tipo,c.mun,fmtN(c.area,2),fmtN(c.mf,2),CST[c.st]||c.st,c.cond,dBR(c.criado)]),{fontSize:6.5,colW:{1:52}});}
+function carTablePDF(TABLE,L,terr){if(!L||!L.list.length)return;TABLE([terr?"% do território":"Distância","Código do imóvel","Tipo","Município","Área (ha)","Mód. fiscais","Situação","Condição","Cadastro"],
+  L.list.map(c=>[terr?pctTxt(c.pct):c.d===0?"no ponto":c.d==null?"–":fmtKm(c.d),c.cod,CTIPO[c.tipo]||c.tipo,c.mun,fmtN(c.area,2),fmtN(c.mf,2),CST[c.st]||c.st,c.cond,dBR(c.criado)]),{fontSize:6.5,colW:{1:52}});}
 
 /* ---------- samples & boot ---------- */
 const SAMPLES=[["Fundo de pasto, Pilão Arcado", -43.1144, -10.1696], ["Eólicas, Sento Sé", -41.2, -10.05], ["Ouro, Jacobina", -40.52, -11.18], ["Urânio e ferro, Caetité", -42.48, -14.06], ["Quilombo, Iguape (Cachoeira)", -38.8478, -12.6867], ["Oeste agrícola, São Desidério", -45.7, -12.5]];

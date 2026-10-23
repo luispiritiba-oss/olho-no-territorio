@@ -214,10 +214,16 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
         <h2>Consultar um ponto</h2>
         <div class="row">
           <button type="button" class="btn primary" id="gps">Usar minha localização</button>
-          <label class="btn" for="foto">Usar foto do local</label>
           <input type="file" id="foto" accept="image/jpeg,image/*" hidden>
         </div>
         <div class="helpbox" id="lochelp" hidden></div>
+        <label class="label" for="carcod">Ou busque pelo nº do CAR / CEFIR</label>
+        <div class="row">
+          <input id="carcod" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="BA-2924405-1400.2238.6E4D…" style="flex:1 1 220px;min-width:0;font-family:var(--f-mono);font-size:14px">
+          <button type="button" class="btn" id="cargo">Buscar perímetro</button>
+        </div>
+        <p class="hintsmall">Traz o perímetro do imóvel ou do território direto do SICAR, para analisar as sobreposições e baixar em KML ou GeoJSON. Precisa de internet.</p>
+        <p class="msg" id="carmsg" role="status"></p>
         <label class="label" for="coord">Cole coordenadas ou um link de mapa</label>
         <div class="row">
           <input id="coord" autocomplete="off" placeholder="-10.5445, -40.4047 ou link do Google Maps">
