@@ -136,7 +136,7 @@ async function loadUF(){try{const b=await fetch("d/base.json").then(r=>r.json())
   UF=b.uf.map(s=>s.split("|").map(p=>{const v=p.split(",");let x=0,y=0;const o=[];for(let i=0;i<v.length;i+=2){x+=+v[i];y+=+v[i+1];o.push([X0+x/1e4,Y0+y/1e4]);}return o;})).flat().sort((a,b)=>b.length-a.length).slice(0,1);}catch(e){UF=null;}}
 async function enter(){const c=$("chave").value.trim()||ls.get("ot_painel")||"";$("gerr").textContent="Carregando…";
   try{D=await load(c);ls.set("ot_painel",c);$("gate").hidden=true;$("main").hidden=false;setup();render();}
-  catch(e){$("gerr").textContent=e.message==="chave do painel inválida"?"Chave incorreta.":("Não foi possível carregar: "+e.message);}}
+  catch(e){$("gerr").textContent=e.message==="chave do painel inválida"?"Chave incorreta.":e.message==="chave inválida"?"O script do Google ainda está na versão antiga, sem o painel. Atualize o script (Implantar → Gerenciar implantações → Nova versão) e tente de novo.":("Não foi possível carregar: "+e.message);}}
 $("entrar").onclick=enter;$("chave").addEventListener("keydown",e=>{if(e.key==="Enter")enter();});
 $("recarregar").onclick=async()=>{$("upd").textContent="Atualizando…";try{D=await load(ls.get("ot_painel")||"");setup(true);render();}catch(e){$("upd").textContent="Falha ao atualizar: "+e.message;}};
 const yr=d=>d?new Date(d).getFullYear():null,mo=d=>d?new Date(d).getMonth():null;
