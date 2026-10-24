@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel de Monitoramento</title>
+<meta name="description" content="Monitoramento anual dos registros, territórios e relatórios enviados pelo app Olho no Território.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{--paper:#f2f3ee;--card:#fcfcfb;--ink:#1b211e;--mute:#52514e;--line:#dcdfd6;--accent:#0d6a52;--accent-ink:#fff;--grid:#e6e8e1;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--up:#2e6a39;--down:#b0261d;--map:#e9ebe4;--mapline:#b9bfb4;
+  --f-d:"Bricolage Grotesque","Atkinson Hyperlegible",system-ui,sans-serif;--f-b:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#141816;--card:#1a1a19;--ink:#f0efec;--mute:#c3c2b7;--line:#33362f;--accent:#4fbf98;--accent-ink:#06261c;--grid:#2a2d27;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--up:#8fd19b;--down:#ff8a7f;--map:#20241f;--mapline:#4a5148;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#141816;--card:#1a1a19;--ink:#f0efec;--mute:#c3c2b7;--line:#33362f;--accent:#4fbf98;--accent-ink:#06261c;--grid:#2a2d27;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--up:#8fd19b;--down:#ff8a7f;--map:#20241f;--mapline:#4a5148;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-b);font-size:16px;line-height:1.45}
+.wrap{max-width:1200px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-left)) 48px}
+header{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center;margin-bottom:16px}
+header img{width:120px;height:auto;background:#fff;border-radius:12px;padding:6px;border:1px solid var(--line)}
+h1{font-family:var(--f-d);font-weight:800;font-size:clamp(24px,4.5vw,34px);margin:0;line-height:1.05}
+.sub{margin:4px 0 0;color:var(--mute);font-size:15px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:16px}
+.bar label{font-size:13px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;display:flex;gap:8px;align-items:center}
+select,input,button{font-family:inherit;font-size:15px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper);color:var(--ink);min-height:40px}
+button{cursor:pointer;font-weight:700;background:var(--card)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.bar .sp{flex:1}
+.upd{font-size:13px;color:var(--mute)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi .l{font-size:13px;color:var(--mute);font-weight:700}
+.kpi .v{font-family:var(--f-d);font-weight:800;font-size:34px;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:13px;margin-top:4px;color:var(--mute)}
+.kpi .d.up{color:var(--up)}.kpi .d.down{color:var(--down)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.card.wide{grid-column:1/-1}
+.card h2{font-family:var(--f-d);font-weight:700;font-size:19px;margin:0 0 4px}
+.card .note{font-size:13px;color:var(--mute);margin:0 0 10px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;margin:4px 0 8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.legend i.dot{border-radius:50%}
+svg{display:block;width:100%;height:auto}
+.ax{fill:var(--mute);font-size:12px;font-family:var(--f-b)}
+.gl{stroke:var(--grid);stroke-width:1}
+.lbl{fill:var(--ink);font-size:12px;font-family:var(--f-b)}
+.hb{display:flex;flex-direction:column;gap:6px}
+.hb .r{display:grid;grid-template-columns:minmax(0,11em) minmax(0,1fr) 3em;gap:8px;align-items:center;font-size:14px}
+.hb .r span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb .t{height:14px;background:var(--paper);border-radius:4px;overflow:hidden}
+.hb .f{height:100%;border-radius:0 4px 4px 0;background:var(--s1)}
+.hb .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th,.tbl td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl th{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;background:var(--card)}
+.tbl td.n{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow:auto;max-height:420px}
+#tterr .tbl{min-width:820px}#tcom .tbl,#trel .tbl{min-width:420px}
+.tip{position:fixed;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.15);z-index:9;max-width:240px}
+.empty{color:var(--mute);font-size:14px;padding:12px 0}
+.gate{max-width:480px;margin:40px auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.err{color:var(--down);font-size:14px;min-height:1.2em;margin:0}
+a{color:var(--accent)}
+.foot{margin-top:18px;font-size:13px;color:var(--mute);max-width:80ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="icons/campanha.jpg" alt="Campanha Permanente em Defesa dos Territórios Tradicionais" width="554" height="463">
+    <div><h1>Painel de monitoramento</h1><p class="sub">Olho no Território · dados enviados pelo aplicativo para a planilha do projeto</p></div>
+  </header>
+
+  <div class="gate" id="gate">
+    <h2 style="margin:0;font-family:var(--f-d)">Acesso da equipe</h2>
+    <p style="margin:0;color:var(--mute);font-size:15px">Digite a chave do painel. Ela fica guardada neste navegador. O painel mostra só números, mapas e nomes de territórios, sem dados pessoais.</p>
+    <input id="chave" type="password" autocomplete="off" placeholder="Chave do painel">
+    <button class="primary" id="entrar">Abrir o painel</button>
+    <p class="err" id="gerr" role="status"></p>
+  </div>
+
+  <main id="main" hidden>
+    <div class="bar">
+      <label>Ano <select id="ano"></select></label>
+      <label>Município <select id="fmun"><option value="">Todos</option></select></label>
+      <span class="sp"></span>
+      <span class="upd" id="upd"></span>
+      <button id="recarregar">Atualizar</button>
+      <button id="csv">Baixar resumo (CSV)</button>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="grid">
+      <section class="card wide"><h2>Envios por mês</h2><p class="note" id="nmes"></p>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Registros de campo</span><span><i style="background:var(--s2)"></i>Territórios analisados</span><span><i style="background:var(--s3)"></i>Relatórios gerados</span></div>
+        <div id="cmes"></div></section>
+      <section class="card"><h2>Registros de campo por tipo</h2><p class="note">O que as equipes e comunidades anotaram em campo.</p><div id="ctipo" class="hb"></div></section>
+      <section class="card"><h2>Municípios com mais atividade</h2><p class="note">Registros, territórios e relatórios somados.</p><div id="cmun" class="hb"></div></section>
+      <section class="card wide"><h2>Onde estão os registros</h2><p class="note">Cada ponto é um registro de campo, um relatório por ponto ou uma consulta guardada.</p>
+        <div class="legend"><span><i class="dot" style="background:var(--s1)"></i>Registro de campo</span><span><i class="dot" style="background:var(--s3)"></i>Relatório por ponto</span><span><i class="dot" style="background:var(--mute)"></i>Consulta</span></div>
+        <div id="cmapa"></div></section>
+      <section class="card wide"><h2>Territórios analisados</h2><p class="note">Sobreposições encontradas no território de cada comunidade.</p><div class="scroll" id="tterr"></div></section>
+      <section class="card"><h2>Comunidades participantes</h2><p class="note">Pela comunidade informada no cadastro de quem enviou.</p><div class="scroll" id="tcom"></div></section>
+      <section class="card"><h2>Relatórios gerados</h2><p class="note">Os PDFs ficam na pasta "relatorios" do Drive (acesso restrito à equipe).</p><div class="scroll" id="trel"></div></section>
+    </div>
+    <p class="foot" id="foot"></p>
+  </main>
+</div>
+<div class="tip" id="tip" hidden></div>
+<script src="config.js?v=150"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=n=>Number(n||0).toLocaleString("pt-BR");
+const MESES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const CFG=Object.assign({endpoint:""},window.OT_CONFIG||{});
+const ls={get:k=>{try{return localStorage.getItem(k);}catch(e){return null;}},set:(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}}};
+let D=null,UF=null;
+const tip=$("tip");
+function showTip(e,html){tip.innerHTML=html;tip.hidden=false;const x=Math.min(window.innerWidth-250,e.clientX+12),y=e.clientY+12;tip.style.left=x+"px";tip.style.top=y+"px";}
+function hideTip(){tip.hidden=true;}
+document.addEventListener("scroll",hideTip,{passive:true});
+async function load(chave){
+  if(!CFG.endpoint)throw new Error("O endereço do script ainda não foi configurado no aplicativo.");
+  const r=await fetch(CFG.endpoint+"?painel=1&chave="+encodeURIComponent(chave)+"&t="+Date.now());
+  const j=await r.json();if(!j.ok)throw new Error(j.erro||"erro no servidor");return j;}
+async function loadUF(){try{const b=await fetch("d/base.json").then(r=>r.json());const X0=b.X0,Y0=b.Y0;
+  UF=b.uf.map(s=>s.split("|").map(p=>{const v=p.split(",");let x=0,y=0;const o=[];for(let i=0;i<v.length;i+=2){x+=+v[i];y+=+v[i+1];o.push([X0+x/1e4,Y0+y/1e4]);}return o;})).flat().sort((a,b)=>b.length-a.length).slice(0,1);}catch(e){UF=null;}}
+async function enter(){const c=$("chave").value.trim()||ls.get("ot_painel")||"";$("gerr").textContent="Carregando…";
+  try{D=await load(c);ls.set("ot_painel",c);$("gate").hidden=true;$("main").hidden=false;setup();render();}
+  catch(e){$("gerr").textContent=e.message==="chave do painel inválida"?"Chave incorreta.":("Não foi possível carregar: "+e.message);}}
+$("entrar").onclick=enter;$("chave").addEventListener("keydown",e=>{if(e.key==="Enter")enter();});
+$("recarregar").onclick=async()=>{$("upd").textContent="Atualizando…";try{D=await load(ls.get("ot_painel")||"");setup(true);render();}catch(e){$("upd").textContent="Falha ao atualizar: "+e.message;}};
+const yr=d=>d?new Date(d).getFullYear():null,mo=d=>d?new Date(d).getMonth():null;
+function setup(keep){const ys=new Set();["registros","territorios","relatorios","consultas","pessoas"].forEach(k=>D[k].forEach(o=>{const y=yr(o.d);if(y)ys.add(y);}));ys.add(new Date().getFullYear());
+  const s=$("ano"),cur=keep?s.value:"";s.innerHTML=[...ys].sort((a,b)=>b-a).map(y=>`<option>${y}</option>`).join("")+`<option value="todos">Todos os anos</option>`;if(cur)s.value=cur;
+  const ms=new Set();["registros","territorios","relatorios"].forEach(k=>D[k].forEach(o=>{String(o.mun||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(m=>ms.add(m));}));
+  const f=$("fmun"),fc=f.value;f.innerHTML=`<option value="">Todos</option>`+[...ms].sort((a,b)=>a.localeCompare(b,"pt")).map(m=>`<option>${esc(m)}</option>`).join("");if(fc)f.value=fc;
+  s.onchange=render;f.onchange=render;
+  $("upd").textContent="Dados de "+new Date(D.atualizado).toLocaleString("pt-BR");
+  $("foot").innerHTML=`Fonte: planilha "Olho no Território – respostas"${D.planilha?` (<a href="${esc(D.planilha)}" target="_blank" rel="noopener">abrir no Drive</a>, só para quem tem acesso)`:""}. Os números contam os envios que já chegaram à planilha; o que ainda está guardado nos celulares sem internet entra quando eles sincronizarem. O painel não mostra nomes, CPF, datas de nascimento nem as descrições escritas nos registros.`;}
+function filt(arr,y,mun){return arr.filter(o=>(y==="todos"||yr(o.d)===+y)&&(!mun||String(o.mun||"").split(",").map(x=>x.trim()).includes(mun)));}
+function delta(a,b){if(b==null)return "";if(!b&&!a)return `<div class="d">igual ao ano anterior</div>`;if(!b)return `<div class="d up">novo em relação ao ano anterior</div>`;const p=Math.round((a-b)/b*100);return `<div class="d ${p>0?"up":p<0?"down":""}">${p>0?"+":""}${p}% em relação a ${$("ano").value-1} (${fmt(b)})</div>`;}
+function render(){hideTip();const y=$("ano").value,mun=$("fmun").value;const py=y==="todos"?null:String(+y-1);
+  const R=filt(D.registros,y,mun),T=filt(D.territorios,y,mun),L=filt(D.relatorios,y,mun),C=filt(D.consultas,y,mun),P=filt(D.pessoas,y,mun);
+  const pv=py?{R:filt(D.registros,py,mun).length,T:filt(D.territorios,py,mun).length,L:filt(D.relatorios,py,mun).length,P:filt(D.pessoas,py,mun).length}:{};
+  const muns=new Set();[...R,...T,...L].forEach(o=>String(o.mun||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(m=>muns.add(m)));
+  const coms=new Set([...R,...T,...L].map(o=>o.com).filter(Boolean));
+  const K=[["Registros de campo",R.length,pv.R],["Territórios analisados",T.length,pv.T],["Relatórios gerados",L.length,pv.L],["Pessoas cadastradas no ano",P.length,pv.P],["Municípios com atividade",muns.size,null],["Comunidades com envios",coms.size,null]];
+  $("kpis").innerHTML=K.map(([l,v,p])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${fmt(v)}</div>${py&&p!=null?delta(v,p):""}</div>`).join("");
+  monthChart(R,T,L,y);
+  hbars($("ctipo"),count(R.map(o=>o.tipo||"Sem tipo")),"var(--s1)","registro(s)");
+  const mc={};[...R,...T,...L].forEach(o=>String(o.mun||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(m=>mc[m]=(mc[m]||0)+1));hbars($("cmun"),Object.entries(mc).sort((a,b)=>b[1]-a[1]).slice(0,12),"var(--s1)","envio(s)");
+  mapa(R,L,C);terrTable(T);comTable(R,T,L);relTable(L);}
+function count(a){const m={};a.forEach(k=>m[k]=(m[k]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]);}
+function hbars(el,rows,color,unit){if(!rows.length){el.innerHTML=`<p class="empty">Nada neste período.</p>`;return;}const mx=Math.max(...rows.map(r=>r[1]));
+  el.innerHTML=rows.map(([k,v])=>`<div class="r" title="${esc(k)}: ${v} ${unit}"><span>${esc(k)}</span><div class="t"><div class="f" style="width:${v/mx*100}%;background:${color}"></div></div><span class="n">${fmt(v)}</span></div>`).join("");}
+function monthChart(R,T,L,y){const el=$("cmes");let keys,lab;
+  if(y==="todos"){const ys=new Set([...R,...T,...L].map(o=>yr(o.d)).filter(Boolean));keys=[...ys].sort();lab=k=>String(k);}else{keys=[...Array(12).keys()];lab=k=>MESES[k];}
+  const key=o=>y==="todos"?yr(o.d):mo(o.d);const S=[[R,"var(--s1)","Registros"],[T,"var(--s2)","Territórios"],[L,"var(--s3)","Relatórios"]];
+  const v=keys.map(k=>S.map(([a])=>a.filter(o=>key(o)===k).length));const tot=v.map(r=>r.reduce((a,b)=>a+b,0));const mx=Math.max(1,...tot);
+  $("nmes").textContent=y==="todos"?"Total de envios por ano.":`Envios de ${y}, mês a mês. Passe o dedo ou o mouse sobre as barras para ver os números.`;
+  if(!keys.length){el.innerHTML=`<p class="empty">Nada neste período.</p>`;return;}
+  const W=Math.max(360,Math.min(900,el.clientWidth||760)),H=W<500?220:240,ml=30,mr=6,mt=14,mb=24,pw=W-ml-mr,ph=H-mt-mb,bw=pw/keys.length,gap=Math.max(2,bw*0.22);
+  const step=mx<=5?1:mx<=10?2:Math.ceil(mx/5/5)*5;const top=Math.ceil(mx/step)*step;const Y=n=>mt+ph-n/top*ph;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Envios por período">`;
+  for(let g=0;g<=top;g+=step)s+=`<line class="gl" x1="${ml}" x2="${W-mr}" y1="${Y(g)}" y2="${Y(g)}"/><text class="ax" x="${ml-6}" y="${Y(g)+4}" text-anchor="end">${g}</text>`;
+  keys.forEach((k,i)=>{const x=ml+i*bw+gap/2,w=bw-gap;let acc=0;
+    S.forEach(([,c],si)=>{const n=v[i][si];if(!n)return;const y0=Y(acc),y1=Y(acc+n);const h=y0-y1-(acc?2:0);s+=`<rect x="${x}" y="${y1}" width="${w}" height="${Math.max(1,h)}" rx="${acc+n===tot[i]?3:0}" fill="${c}"/>`;acc+=n;});
+    if(tot[i])s+=`<text class="lbl" x="${x+w/2}" y="${Y(tot[i])-4}" text-anchor="middle">${tot[i]}</text>`;
+    s+=`<text class="ax" x="${x+w/2}" y="${H-8}" text-anchor="middle">${lab(k)}</text><rect class="hit" data-i="${i}" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ph}" fill="transparent"/>`;});
+  el.innerHTML=s+"</svg>";
+  el.querySelectorAll(".hit").forEach(r=>{const i=+r.dataset.i;const f=e=>showTip(e,`<b>${lab(keys[i])}${y!=="todos"?" de "+y:""}</b><br>Registros: ${v[i][0]}<br>Territórios: ${v[i][1]}<br>Relatórios: ${v[i][2]}`);r.addEventListener("pointermove",f);r.addEventListener("pointerdown",f);r.addEventListener("pointerleave",hideTip);});}
+function parseLL(s){const m=String(s||"").match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);return m?{lat:+m[1],lon:+m[2]}:null;}
+function mapa(R,L,C){const el=$("cmapa");const W=760,H=620,b={w:-46.8,e:-37.2,s:-18.5,n:-8.4};const kx=Math.cos(13*Math.PI/180);
+  const sx=W/((b.e-b.w)*kx),sy=H/(b.n-b.s),sc=Math.min(sx,sy);const ox=(W-(b.e-b.w)*kx*sc)/2,oy=(H-(b.n-b.s)*sc)/2;
+  const P=(lon,lat)=>[ox+(lon-b.w)*kx*sc,oy+(b.n-lat)*sc];
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa da Bahia com os pontos enviados"><rect width="${W}" height="${H}" fill="transparent"/>`;
+  if(UF)s+=UF.map(r=>`<path d="M${r.map(p=>P(p[0],p[1]).map(v=>v.toFixed(1)).join(",")).join("L")}Z" fill="var(--map)" stroke="var(--mapline)" stroke-width="1.5"/>`).join("");
+  const pts=[...C.filter(o=>o.lat&&o.lon).map(o=>({...o,k:"c"})),...L.map(o=>({...o,...(o.tipo==="Ponto"?parseLL(o.local):null),k:"l"})).filter(o=>o.lat),...R.filter(o=>o.lat&&o.lon).map(o=>({...o,k:"r"}))];
+  const col={r:"var(--s1)",l:"var(--s3)",c:"var(--mute)"},nm={r:"Registro de campo",l:"Relatório por ponto",c:"Consulta"};
+  pts.forEach((o,i)=>{const [x,y]=P(o.lon,o.lat);s+=`<circle data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${o.k==="c"?4:6}" fill="${col[o.k]}" stroke="var(--card)" stroke-width="2" opacity="${o.k==="c"?.6:.95}"/>`;});
+  el.innerHTML=s+"</svg>"+(pts.length?"":`<p class="empty">Nenhum ponto neste período.</p>`);
+  el.querySelectorAll("circle").forEach(c=>{const o=pts[+c.dataset.i];const f=e=>showTip(e,`<b>${nm[o.k]}</b>${o.tipo&&o.k==="r"?"<br>"+esc(o.tipo):""}<br>${esc(o.mun||"")}<br>${new Date(o.d).toLocaleDateString("pt-BR")}`);c.addEventListener("pointermove",f);c.addEventListener("pointerdown",f);c.addEventListener("pointerleave",hideTip);});}
+const pc=v=>v==null?"–":(v<1&&v>0?"<1":Math.round(v))+"%";
+function terrTable(T){const el=$("tterr");if(!T.length){el.innerHTML=`<p class="empty">Nenhum território analisado neste período.</p>`;return;}
+  el.innerHTML=`<table class="tbl"><thead><tr><th>Data</th><th>Território</th><th>Tipo</th><th>Município(s)</th><th>Área (ha)</th><th>CAR individual</th><th>Processos minerários</th><th>Área com mineração</th><th>Eólicas sobre</th><th>Limite</th></tr></thead><tbody>`+
+  T.slice().sort((a,b)=>String(b.d).localeCompare(String(a.d))).map(t=>`<tr><td>${new Date(t.d).toLocaleDateString("pt-BR")}</td><td><b>${esc(t.nome)}</b>${t.cod?`<br><span style="font-size:12px;color:var(--mute)">${esc(t.cod)}</span>`:""}</td><td>${esc(t.tipo)}</td><td>${esc(t.mun)}</td><td class="n">${t.area!=null?fmt(Math.round(t.area)):"–"}</td><td class="n">${pc(t.carPct)}</td><td class="n">${t.nMin??"–"}</td><td class="n">${pc(t.minPct)}</td><td>${esc(t.eol)||"–"}</td><td>${t.geo?`<a href="${esc(t.geo)}" target="_blank" rel="noopener">GeoJSON</a>`:"–"}</td></tr>`).join("")+`</tbody></table>`;}
+function comTable(R,T,L){const el=$("tcom");const m={};const add=(o,k)=>{const c=o.com||"Não informada";m[c]=m[c]||{r:0,t:0,l:0,mun:new Set()};m[c][k]++;if(o.mun)String(o.mun).split(",").forEach(x=>x.trim()&&m[c].mun.add(x.trim()));};
+  R.forEach(o=>add(o,"r"));T.forEach(o=>add(o,"t"));L.forEach(o=>add(o,"l"));const rows=Object.entries(m).sort((a,b)=>(b[1].r+b[1].t+b[1].l)-(a[1].r+a[1].t+a[1].l));
+  el.innerHTML=rows.length?`<table class="tbl"><thead><tr><th>Comunidade</th><th>Município(s)</th><th>Registros</th><th>Territórios</th><th>Relatórios</th></tr></thead><tbody>`+rows.map(([c,v])=>`<tr><td>${esc(c)}</td><td>${esc([...v.mun].join(", "))}</td><td class="n">${v.r}</td><td class="n">${v.t}</td><td class="n">${v.l}</td></tr>`).join("")+`</tbody></table>`:`<p class="empty">Nada neste período.</p>`;}
+function relTable(L){const el=$("trel");el.innerHTML=L.length?`<table class="tbl"><thead><tr><th>Data</th><th>Tipo</th><th>Local</th><th>Município</th><th>PDF</th></tr></thead><tbody>`+L.slice().sort((a,b)=>String(b.d).localeCompare(String(a.d))).map(r=>`<tr><td>${new Date(r.d).toLocaleDateString("pt-BR")}</td><td>${esc(r.tipo)}</td><td>${esc(r.local)}</td><td>${esc(r.mun)}</td><td>${r.pdf?`<a href="${esc(r.pdf)}" target="_blank" rel="noopener">abrir</a>`:"–"}</td></tr>`).join("")+`</tbody></table>`:`<p class="empty">Nenhum relatório neste período.</p>`;}
+$("csv").onclick=()=>{const y=$("ano").value,mun=$("fmun").value;const R=filt(D.registros,y,mun),T=filt(D.territorios,y,mun),L=filt(D.relatorios,y,mun),P=filt(D.pessoas,y,mun);
+  const lines=[["indicador","valor"],["ano",y],["município",mun||"todos"],["registros de campo",R.length],["territórios analisados",T.length],["relatórios gerados",L.length],["pessoas cadastradas",P.length],[],["tipo de registro","quantidade"],...count(R.map(o=>o.tipo||"Sem tipo")),[],["território","tipo","municípios","área (ha)","% CAR individual","processos minerários","% com mineração"],...T.map(t=>[t.nome,t.tipo,t.mun,t.area,t.carPct,t.nMin,t.minPct])];
+  const txt="﻿"+lines.map(r=>r.map(v=>{const s=String(v??"");return /[;"\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}).join(";")).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download=`painel-olho-no-territorio_${y}.csv`;document.body.appendChild(a);a.click();a.remove();};
+loadUF();
+if(ls.get("ot_painel"))enter();
+})();
+</script>
+</body>
+</html>
