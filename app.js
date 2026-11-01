@@ -440,9 +440,9 @@ function threatIndex(o){const C=[],A=[];const terr=o.mode==="terr",x=o.r,a=o.a;
   const vl=vegLoss(terr?x.series:a.series);
   if(vl&&vl.pp>IDX.perdaConflito)C.push(`Desmatamento: perda de ${fmtN(vl.pp,1)} pontos percentuais de vegetação nativa entre ${vl.de} e ${vl.ate} (MapBiomas)`);
   else if(vl&&vl.pp>=IDX.perdaAmeaca)A.push(`Desmatamento: perda de ${fmtN(vl.pp,1)} pontos percentuais de vegetação nativa entre ${vl.de} e ${vl.ate} (MapBiomas)`);
-  /* 5. sobreposição com unidade de conservação */
-  const ucs=terr?x.uc:a.terr.filter(t=>t.kind==="uc"&&t.d===0);
-  if(ucs.length)C.push(`Unidade de conservação: ${terr?"o território se sobrepõe a":"o ponto está dentro de"} ${ucs.length>1?ucs.length+" UCs":"UC"}: `+ucs.slice(0,4).map(u=>`${u.name} (${u.cat||u.sig}${u.grp==="PI"?", proteção integral":u.grp==="US"?", uso sustentável":""}${terr?", "+pctTxt(u.pct)+" do território":""})`).join("; ")+(ucs.length>4?"…":""));
+  /* 5. sobreposição com unidade de conservação de proteção integral (APA, RPPN e outras de uso sustentável não contam) */
+  const ucs=(terr?x.uc:a.terr.filter(t=>t.kind==="uc"&&t.d===0)).filter(u=>u.grp==="PI");
+  if(ucs.length)C.push(`Unidade de conservação de proteção integral: ${terr?"o território se sobrepõe a":"o ponto está dentro de"} ${ucs.length>1?ucs.length+" UCs":"UC"}: `+ucs.slice(0,4).map(u=>`${u.name} (${u.cat||u.sig}${terr?", "+pctTxt(u.pct)+" do território":""})`).join("; ")+(ucs.length>4?"…":""));
   /* 6. registro comunitário de conflito ou de ameaça */
   const base=C.length?2:A.length?1:0,rc=rcomIn(o);
   rc.forEach(g=>(g.tipo==="conflito"?C:A).push(`Registro comunitário de ${g.tipo==="conflito"?"conflito":"ameaça"} (${new Date(g.criadoEm).toLocaleDateString("pt-BR")}): ${g.desc}`));
@@ -458,7 +458,7 @@ function idxHTML(I,id){const N=NIVEIS[I.nivel];return `<section class="blk idx" 
    <label>A comunidade relata<select data-rctipo><option value="conflito">Conflito</option><option value="ameaca">Ameaça</option></select></label>
    <label>Descreva qual é o conflito ou a ameaça<textarea data-rcdesc maxlength="600" rows="3" placeholder="Ex.: fazendeiro cercou a área de solta do fundo de pasto"></textarea></label>
    <button type="button" class="btn sm primary" data-rcsend>Salvar registro comunitário</button><p class="msg" data-rcmsg role="status"></p></details>
-  <p class="hintsmall">Critérios das bases: conflito = mineração com lavra autorizada ou parque eólico/solar em operação ou obra a até ${IDX.conflitoKm} km (ou dentro do território), linha de transmissão existente cruzando o território, perda de vegetação nativa acima de ${IDX.perdaConflito} pontos em ${IDX.anosPerda} anos, ponto dentro de unidade de conservação ou território sobreposto a ela. Ameaça = processos minerários e projetos de energia a até ${IDX.ameacaKm} km (ou dentro do território), linha planejada, perda de vegetação de ${IDX.perdaAmeaca} a ${IDX.perdaConflito} pontos. Os registros comunitários dos últimos ${IDX.mesesRegistro} meses também contam.</p></section>`;}
+  <p class="hintsmall">Critérios das bases: conflito = mineração com lavra autorizada ou parque eólico/solar em operação ou obra a até ${IDX.conflitoKm} km (ou dentro do território), linha de transmissão existente cruzando o território, perda de vegetação nativa acima de ${IDX.perdaConflito} pontos em ${IDX.anosPerda} anos, ponto dentro de unidade de conservação de proteção integral (parque, estação ecológica, reserva biológica, monumento natural, refúgio de vida silvestre) ou território sobreposto a ela. Ameaça = processos minerários e projetos de energia a até ${IDX.ameacaKm} km (ou dentro do território), linha planejada, perda de vegetação de ${IDX.perdaAmeaca} a ${IDX.perdaConflito} pontos. Os registros comunitários dos últimos ${IDX.mesesRegistro} meses também contam.</p></section>`;}
 function wireIdx(id,I,ctx,redo){const el=$(id);if(!el)return;const b=el.querySelector("[data-rcsend]");if(!b)return;b.onclick=async()=>{const m=el.querySelector("[data-rcmsg]"),tp=el.querySelector("[data-rctipo]").value,desc=el.querySelector("[data-rcdesc]").value.trim().slice(0,600);
   if(desc.length<5){m.textContent="Descreva qual é o conflito ou a ameaça.";return;}
   const c=ctx(),nv=tp==="conflito"?2:1,g={id:uid(),tipo:tp,desc,lat:c.lat??null,lon:c.lon??null,terrId:c.territorioId||"",criadoEm:new Date().toISOString()};
