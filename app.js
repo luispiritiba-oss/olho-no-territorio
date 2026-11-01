@@ -1210,7 +1210,7 @@ function initMbYear(){const box=$("bases");if(!box)return;const w=document.creat
 
 /* ---------- samples & boot ---------- */
 const SAMPLES=[["Fundo de pasto, Pilão Arcado", -43.1144, -10.1696], ["Eólicas, Sento Sé", -41.2, -10.05], ["Ouro, Jacobina", -40.52, -11.18], ["Urânio e ferro, Caetité", -42.48, -14.06], ["Quilombo, Iguape (Cachoeira)", -38.8478, -12.6867], ["Oeste agrícola, São Desidério", -45.7, -12.5]];
-function bootSamples(){const smp=$("samples");SAMPLES.forEach(([n,x,y])=>{const b=document.createElement("button");b.type="button";b.textContent=n;b.onclick=()=>{coord.value=y.toFixed(4)+", "+x.toFixed(4);goLoc(coord.value,"exemplo");};smp.appendChild(b);});}
+function bootSamples(){const smp=$("samples");if(!smp)return;SAMPLES.forEach(([n,x,y])=>{const b=document.createElement("button");b.type="button";b.textContent=n;b.onclick=()=>{coord.value=y.toFixed(4)+", "+x.toFixed(4);goLoc(coord.value,"exemplo");};smp.appendChild(b);});}
 window.addEventListener("resize",()=>resize());
 resize();bootSamples();initBases();initMbYear();
 loadBase().then(()=>{$("hint").textContent="Toque no mapa ou use sua localização";draw();initDB();window.__ready=true;}).catch(e=>{$("hint").textContent="Não foi possível carregar os dados. Verifique a internet e recarregue a página.";console.error(e);});

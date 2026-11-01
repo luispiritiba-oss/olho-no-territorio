@@ -192,6 +192,7 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
 .idxbadge{display:flex;align-items:baseline;gap:10px;color:#fff;border-radius:10px;padding:10px 14px;margin:4px 0 8px}.idxbadge b{font-size:19px}.idxbadge span{font-size:13px;opacity:.92}
 .idxl{margin:2px 0 8px;padding-left:20px;font-size:14px}.idxl li{margin:2px 0}
 details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:6px 10px}details.cal summary{cursor:pointer;font-weight:600;font-size:14px}details.cal label{display:block;margin:6px 0;font-size:14px}details.cal select,details.cal textarea{width:100%;font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--card,#fff);color:inherit;box-sizing:border-box}
+.terrsub{display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:10px 0;margin:4px 0}
 </style>
 
 </head>
@@ -230,19 +231,12 @@ details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:
 
     <div class="col">
       <div class="panel ask">
-        <h2>Consultar um ponto</h2>
+        <h2>Consultar um ponto ou território</h2>
         <div class="row">
           <button type="button" class="btn primary" id="gps">Usar minha localização</button>
           <input type="file" id="foto" accept="image/jpeg,image/*" hidden>
         </div>
         <div class="helpbox" id="lochelp" hidden></div>
-        <label class="label" for="carcod">Ou busque pelo nº do CAR / CEFIR</label>
-        <div class="row">
-          <input id="carcod" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="BA-2924405-1400.2238.6E4D…" style="flex:1 1 220px;min-width:0;font-family:var(--f-mono);font-size:14px">
-          <button type="button" class="btn" id="cargo">Buscar perímetro</button>
-        </div>
-        <p class="hintsmall">Traz o perímetro do imóvel ou do território direto do SICAR, para analisar as sobreposições e baixar em KML ou GeoJSON. Precisa de internet.</p>
-        <p class="msg" id="carmsg" role="status"></p>
         <label class="label" for="coord">Cole coordenadas ou um link de mapa</label>
         <div class="row">
           <input id="coord" autocomplete="off" placeholder="-10.5445, -40.4047 ou link do Google Maps">
@@ -261,23 +255,17 @@ details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:
           <input id="mun" list="munlist" autocomplete="off" placeholder="Nome do município">
           <datalist id="munlist"></datalist>
         </div>
-        <div>
-          <div class="label" style="margin-bottom:6px">Pontos de exemplo</div>
-          <div class="samples" id="samples"></div>
-        </div>
         <p class="msg" id="msg" role="status"></p>
-      </div>
-
-      <div class="panel" id="out">
-        <div class="placeholder">
-          <p><strong>Nenhum ponto escolhido ainda.</strong></p>
-          <p>Toque no mapa, cole coordenadas ou use um ponto de exemplo. O resultado aparece aqui e pode ser baixado em PDF.</p>
+        <div id="terrPanel" class="terrsub">
+        <div class="label">Território da comunidade (analisa a área inteira, sem raio)</div>
+        <label class="label" for="carcod">Busque pelo nº do CAR / CEFIR</label>
+        <div class="row">
+          <input id="carcod" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="BA-2924405-1400.2238.6E4D…" style="flex:1 1 220px;min-width:0;font-family:var(--f-mono);font-size:14px">
+          <button type="button" class="btn" id="cargo">Buscar perímetro</button>
         </div>
-      </div>
-
-      <div class="panel ask" id="terrPanel">
-        <h2>Território da comunidade</h2>
-        <p class="hintsmall">Insira o CEFIR coletivo ou outro limite do território para ver o que se sobrepõe a ele.</p>
+        <p class="hintsmall">Traz o perímetro do imóvel ou do território direto do SICAR, para analisar as sobreposições e baixar em KML ou GeoJSON. Precisa de internet.</p>
+        <p class="msg" id="carmsg" role="status"></p>
+        <p class="hintsmall" style="margin:4px 0 0"><b>Ou</b> carregue o arquivo do limite ou desenhe no mapa:</p>
         <div class="row">
           <label class="btn" for="tfile">Carregar arquivo</label>
           <input type="file" id="tfile" accept=".zip,.kml,.kmz,.geojson,.json,.shp,.shx,.dbf,.prj" multiple hidden>
@@ -293,6 +281,14 @@ details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:
         <div id="tform" hidden></div>
         <p class="msg" id="tmsg" role="status"></p>
         <div id="tlist"></div>
+        </div>
+      </div>
+
+      <div class="panel" id="out">
+        <div class="placeholder">
+          <p><strong>Nenhum ponto escolhido ainda.</strong></p>
+          <p>Toque no mapa, use sua localização, cole coordenadas, busque um CAR/CEFIR ou insira o limite do território. O resultado aparece aqui e pode ser baixado em PDF.</p>
+        </div>
       </div>
 
       <div class="panel ask" id="regPanel">
@@ -319,8 +315,8 @@ details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="config.js?v=151"></script>
-<script src="app.js?v=151"></script>
+<script src="config.js?v=152"></script>
+<script src="app.js?v=152"></script>
 <script>
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
 let deferredInstall=null;const ib=document.getElementById("install");
