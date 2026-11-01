@@ -188,6 +188,10 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
 .mapattr{position:absolute;right:6px;bottom:auto;font-size:10px;background:rgba(255,255,255,.8);color:#333;padding:1px 6px;border-radius:6px;max-width:70%;text-align:right}
 .mbyr{display:flex;align-items:center;gap:8px;padding:8px 14px 0;font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
 .mbyr select{min-height:36px;padding:4px 8px;font-size:14px;text-transform:none;letter-spacing:0}
+.aph{margin:10px 0 2px;font-weight:700;font-size:14px;color:var(--ink)}.aph span{color:var(--mute);font-weight:400}.apn{font-size:12.5px!important;color:var(--mute)!important;margin:2px 0 6px!important}
+.idxbadge{display:flex;align-items:baseline;gap:10px;color:#fff;border-radius:10px;padding:10px 14px;margin:4px 0 8px}.idxbadge b{font-size:19px}.idxbadge span{font-size:13px;opacity:.92}
+.idxl{margin:2px 0 8px;padding-left:20px;font-size:14px}.idxl li{margin:2px 0}
+details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:6px 10px}details.cal summary{cursor:pointer;font-weight:600;font-size:14px}details.cal label{display:block;margin:6px 0;font-size:14px}details.cal select,details.cal textarea{width:100%;font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--card,#fff);color:inherit;box-sizing:border-box}
 </style>
 
 </head>
@@ -315,8 +319,8 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="config.js?v=150"></script>
-<script src="app.js?v=150"></script>
+<script src="config.js?v=151"></script>
+<script src="app.js?v=151"></script>
 <script>
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
 let deferredInstall=null;const ib=document.getElementById("install");
