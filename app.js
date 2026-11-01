@@ -414,69 +414,58 @@ async function choose(x,y,how,keepView){
 }
 let lastA=null;
 
-/* ---------- índice de ameaça de conflito (em calibração) ---------- */
-const IDX=Object.assign({conflitoKm:1,ameacaKm:5,perdaConflito:5,perdaAmeaca:2,anosPerda:5,iruAmeaca:10,mfGrande:15,anosRecente:3,mesesRegistro:12,pesoConflito:30,pesoAmeaca:12},(window.OT_CONFIG||{}).indice||{});
-const NIVEIS=[{k:0,n:"Sem ameaça identificada",c:"#2e7d32"},{k:1,n:"Ameaçado",c:"#d99a1e"},{k:2,n:"Em conflito",c:"#b3261e"}];
-const REG_CONF=/Ameaça|Cerca|Desmatamento|Água/;
+/* ---------- conflito e ameaça territorial (bases públicas + registro comunitário) ---------- */
+const IDX=Object.assign({conflitoKm:1,ameacaKm:5,perdaConflito:5,perdaAmeaca:2,anosPerda:5,mesesRegistro:12},(window.OT_CONFIG||{}).indice||{});
+const NIVEIS=[{k:0,n:"Sem conflito ou ameaça identificados",c:"#2e7d32"},{k:1,n:"Ameaça territorial",c:"#d99a1e"},{k:2,n:"Conflito provável",c:"#b3261e"}];
+let RCOM=null;const rcomAll=()=>RCOM||(RCOM=lsGet("ot_rcom")||[]);
 function vegLoss(S){if(!S||!S.byYear||!S.byYear.length)return null;const L=S.byYear[S.byYear.length-1],P=S.byYear.find(b=>b.yr===L.yr-IDX.anosPerda);if(!P)return null;return {pp:P.g.nat-L.g.nat,de:P.yr,ate:L.yr,nat:L.g.nat};}
-function regsIn(test){const lim=Date.now()-IDX.mesesRegistro*30.4*864e5;return REGS.filter(g=>g.lat!=null&&new Date(g.criadoEm).getTime()>=lim&&test(g.lon,g.lat));}
-function threatIndex(o){const C=[],A=[];let conf=false;const terr=o.mode==="terr",x=o.r,a=o.a;
-  const F=(arr,msg)=>arr.length?msg(arr):null,push=(L,t)=>{if(t)L.push(t);};
-  const kmTxt=d=>d===0?(terr?"dentro do território":"no ponto"):"a "+fmtKm(d);
-  /* mineração */
+function rcomIn(o){const lim=Date.now()-IDX.mesesRegistro*30.4*864e5;return rcomAll().filter(g=>new Date(g.criadoEm).getTime()>=lim&&(o.mode==="terr"?((g.terrId&&g.terrId===o.r.t.id)||(g.lat!=null&&inPoly(g.lon,g.lat,o.r.t.rings))):(g.lat!=null&&Math.hypot((g.lon-o.a.x)*KXf(o.a.y),(g.lat-o.a.y)*KY)<=IDX.conflitoKm)));}
+function threatIndex(o){const C=[],A=[];const terr=o.mode==="terr",x=o.r,a=o.a;
+  const F=(arr,msg)=>arr.length?msg(arr):null,push=(L,t)=>{if(t)L.push(t);},pl=(n,s,p)=>n>1?p:s;
+  /* 1. mineração */
   const mins=terr?x.min.map(m=>Object.assign({d:0},m)):[...a.minIn,...a.minNear];
-  const ex=mins.filter(m=>m.st==="ex"&&m.d<=(terr?0:IDX.conflitoKm)),mo=mins.filter(m=>m.st!=="ex"&&m.d<=(terr?0:IDX.ameacaKm)),exFar=terr?[]:mins.filter(m=>m.st==="ex"&&m.d>IDX.conflitoKm&&m.d<=IDX.ameacaKm);
-  push(C,F(ex,L=>`${L.length} processo${L.length>1?"s":""} de mineração com extração autorizada (lavra) ${terr?"sobre o território":"a até "+IDX.conflitoKm+" km"}`));
-  push(A,F([...mo,...exFar],L=>`${L.length} processo${L.length>1?"s":""} de mineração em pesquisa, pedido ou oferta ${terr?"sobre o território":"a até "+IDX.ameacaKm+" km"}`));
-  /* energia */
-  const ens=terr?[...x.eolIn.map(e=>Object.assign({d:0},e)),...x.enNear]:a.enR,op=f=>f==="Operação"||f==="Construção";
-  push(C,F(ens.filter(e=>op(e.fase)&&e.d<=(terr?0:IDX.conflitoKm)),L=>`${L.length} parque${L.length>1?"s":""} eólico${L.length>1?"s":""} ou solar${L.length>1?"es":""} em operação ou obra ${terr?"dentro do território":"a até "+IDX.conflitoKm+" km"}`));
-  push(A,F(ens.filter(e=>(!op(e.fase)&&e.d<=(terr?0:IDX.ameacaKm))||(!terr&&op(e.fase)&&e.d>IDX.conflitoKm&&e.d<=IDX.ameacaKm)),L=>`${L.length} projeto${L.length>1?"s":""} de energia planejado${L.length>1?"s":""}, autorizado${L.length>1?"s":""} ou próximo${L.length>1?"s":""} ${terr?"dentro do território":"a até "+IDX.ameacaKm+" km"}`));
-  /* linhas de transmissão */
+  const ex=mins.filter(m=>m.st==="ex"&&m.d<=(terr?0:IDX.conflitoKm)),mo=mins.filter(m=>(m.st!=="ex"&&m.d<=(terr?0:IDX.ameacaKm))||(!terr&&m.st==="ex"&&m.d>IDX.conflitoKm&&m.d<=IDX.ameacaKm));
+  const subs=L=>[...new Set(L.map(m=>String(m.subs||"").toLowerCase()).filter(Boolean))].slice(0,4).join(", ");
+  push(C,F(ex,L=>`Mineração: ${L.length} ${pl(L.length,"processo","processos")} com extração autorizada (lavra) ${terr?"sobre o território":"a até "+IDX.conflitoKm+" km"}${subs(L)?" ("+subs(L)+")":""}`));
+  push(A,F(mo,L=>`Mineração: ${L.length} ${pl(L.length,"processo","processos")} em pesquisa, pedido ou oferta ${terr?"sobre o território":"a até "+IDX.ameacaKm+" km"}${subs(L)?" ("+subs(L)+")":""}`));
+  /* 2. energia */
+  const ens=terr?[...x.eolIn.map(e=>Object.assign({d:0},e)),...x.enNear]:a.enR,op=f=>f==="Operação"||f==="Construção",nm=L=>L.slice(0,3).map(e=>e.name).join(", ")+(L.length>3?"…":"");
+  push(C,F(ens.filter(e=>op(e.fase)&&e.d<=(terr?0:IDX.conflitoKm)),L=>`Energia: ${L.length} ${pl(L.length,"parque eólico ou solar","parques eólicos ou solares")} em operação ou obra ${terr?"dentro do território":"a até "+IDX.conflitoKm+" km"} (${nm(L)})`));
+  push(A,F(ens.filter(e=>(!op(e.fase)&&e.d<=(terr?0:IDX.ameacaKm))||(!terr&&op(e.fase)&&e.d>IDX.conflitoKm&&e.d<=IDX.ameacaKm)),L=>`Energia: ${L.length} ${pl(L.length,"projeto eólico ou solar","projetos eólicos ou solares")} planejado${pl(L.length,"","s")}, autorizado${pl(L.length,"","s")} ou próximo${pl(L.length,"","s")} ${terr?"dentro do território":"a até "+IDX.ameacaKm+" km"} (${nm(L)})`));
+  /* 3. linhas de transmissão */
   const lte=terr?x.lte:a.lte,ltp=terr?x.ltp:a.ltp;
-  if(terr){if(lte&&lte.d===0)C.push("linha de transmissão existente cruza o território");if(ltp&&ltp.d===0)A.push("linha de transmissão planejada cruza o território");}
-  else{if(lte&&lte.d<=IDX.conflitoKm)A.push(`linha de transmissão existente a ${fmtKm(lte.d)}`);if(ltp&&ltp.d<=IDX.ameacaKm)A.push(`linha de transmissão planejada a ${fmtKm(ltp.d)}`);}
-  /* CAR */
-  const CL=terr?x.carL:a.carL,excl=terr?(x.t.cod||""):"";let iruOv=false;
-  if(CL&&CL.cov){const S=carResumo(CL,excl),cv=CL.cov;
-    if(terr){iruOv=cv.IRU>0;if(cv.IRU>=IDX.iruAmeaca)A.push(`${pctTxt(cv.IRU)} do território declarado como imóvel rural individual no CAR`);
-      const gr=S.grandes.filter(c=>c.mf>IDX.mfGrande);if(gr.length)A.push(`${gr.length} imóve${gr.length>1?"is":"l"} grande${gr.length>1?"s":""} (mais de ${IDX.mfGrande} módulos fiscais) sobre o território`);
-      if(S.recentes.length)A.push(`${S.recentes.length} imóve${S.recentes.length>1?"is":"l"} individua${S.recentes.length>1?"is":"l"} cadastrado${S.recentes.length>1?"s":""} sobre o território nos últimos ${IDX.anosRecente} anos`);}
-    else{iruOv=cv.iruEmColetivo>0;if(cv.iruEmColetivo>0)A.push(`${pctTxt(cv.iruEmColetivo)} do raio com imóvel individual declarado sobre cadastro coletivo (PCT ou AST)`);}}
-  else if(terr&&x.car.pct>=IDX.iruAmeaca){iruOv=true;A.push(`${pctTxt(x.car.pct)} do território com imóvel do CAR (cópia guardada, sem confirmação no SICAR)`);}
-  /* perda de vegetação */
+  if(terr){if(lte&&lte.d===0)C.push(`Linha de transmissão existente cruza o território (${lte.name})`);if(ltp&&ltp.d===0)A.push(`Linha de transmissão planejada cruza o território (${ltp.name})`);}
+  else{if(lte&&lte.d<=IDX.conflitoKm)A.push(`Linha de transmissão existente a ${fmtKm(lte.d)} (${lte.name})`);if(ltp&&ltp.d<=IDX.ameacaKm)A.push(`Linha de transmissão planejada a ${fmtKm(ltp.d)} (${ltp.name})`);}
+  /* 4. perda de vegetação nativa */
   const vl=vegLoss(terr?x.series:a.series);
-  if(vl&&vl.pp>IDX.perdaConflito&&iruOv)C.push(`perda de ${fmtN(vl.pp,1)} pontos percentuais de vegetação nativa entre ${vl.de} e ${vl.ate}, com imóvel individual declarado na área`);
-  else if(vl&&vl.pp>=IDX.perdaAmeaca)A.push(`perda de ${fmtN(vl.pp,1)} pontos percentuais de vegetação nativa entre ${vl.de} e ${vl.ate}`);
-  /* registros de campo e relato da comunidade */
-  const rg=terr?regsIn((lx,ly)=>inPoly(lx,ly,x.t.rings)):regsIn((lx,ly)=>Math.hypot((lx-a.x)*KXf(a.y),(ly-a.y)*KY)<=IDX.conflitoKm);
-  const rc=rg.filter(g=>REG_CONF.test(g.tipo)),ro=rg.filter(g=>!REG_CONF.test(g.tipo));
-  if(rc.length){conf=true;C.push(`${rc.length} registro${rc.length>1?"s":""} de campo nos últimos ${IDX.mesesRegistro} meses: ${[...new Set(rc.map(g=>g.tipo.toLowerCase()))].join(", ")}`);}
-  if(ro.length)A.push(`${ro.length} outro${ro.length>1?"s":""} registro${ro.length>1?"s":""} de campo recente${ro.length>1?"s":""}: ${[...new Set(ro.map(g=>g.tipo.toLowerCase()))].join(", ")}`);
-  if(terr&&x.t.conflito){conf=true;C.unshift("a comunidade relata conflito ativo no território");}
-  const nivel=C.length?2:A.length?1:0,score=Math.min(100,C.length*IDX.pesoConflito+A.length*IDX.pesoAmeaca);
-  const label=nivel===2?(conf?"Em conflito":"Conflito provável"):NIVEIS[nivel].n;
-  return {nivel,label,confirmado:conf,score,conflito:C,ameaca:A,perdaVeg:vl?+vl.pp.toFixed(1):null,carAoVivo:!!(CL&&CL.cov),versao:"calibração 1",limiares:IDX};}
-function idxHTML(I,id){const N=NIVEIS[I.nivel];return `<section class="blk idx" id="${id}" style="--k:${N.c}"><h3>Índice de ameaça de conflito <span class="hintsmall">(em calibração)</span></h3>
-  <div class="idxbadge" style="background:${N.c}"><b>${esc(I.label)}</b><span>pressão ${I.score}/100</span></div>
-  ${I.nivel===2&&!I.confirmado?`<p class="plain">"Conflito provável" quer dizer que as bases públicas indicam conflito, mas a comunidade ainda não confirmou. Um registro de campo ou o relato da comunidade muda para "Em conflito".</p>`:""}
-  ${I.conflito.length?`<p class="label">Sinais de conflito</p><ul class="idxl">${I.conflito.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}
-  ${I.ameaca.length?`<p class="label">Sinais de ameaça</p><ul class="idxl">${I.ameaca.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}
-  ${!I.conflito.length&&!I.ameaca.length?`<p class="empty">Nenhum dos critérios do índice apareceu nas bases consultadas. Isso não garante que não haja conflito: converse com a comunidade.</p>`:""}
-  ${I.carAoVivo?"":`<p class="hintsmall">O critério do CAR ainda usa a cópia guardada; o índice é recalculado quando a consulta ao SICAR termina.</p>`}
-  <details class="cal"><summary>Calibrar: a equipe concorda com este nível?</summary>
-   <label>Nível que a equipe observa no local<select data-calniv>${NIVEIS.map(n=>`<option value="${n.k}"${n.k===I.nivel?" selected":""}>${n.n}</option>`).join("")}</select></label>
-   <label>Por quê? (opcional)<textarea data-calobs maxlength="600" rows="2" placeholder="O que a equipe sabe sobre o local que as bases não mostram"></textarea></label>
-   <button type="button" class="btn sm primary" data-calsend>Enviar avaliação</button><p class="msg" data-calmsg role="status"></p></details>
-  <p class="hintsmall">Critérios: conflito = extração mineral autorizada${" "}ou parque em operação/obra a até ${IDX.conflitoKm} km (ou dentro do território), linha existente cruzando o território, perda de vegetação acima de ${IDX.perdaConflito} pontos em ${IDX.anosPerda} anos com imóvel individual, ou registro de ameaça, cerca, desmatamento ou água nos últimos ${IDX.mesesRegistro} meses. Ameaça = processos minerários e projetos de energia a até ${IDX.ameacaKm} km, linha planejada, imóvel individual sobre ${IDX.iruAmeaca}% ou mais do território, imóvel grande ou recente, ou perda de vegetação de ${IDX.perdaAmeaca} a ${IDX.perdaConflito} pontos.</p></section>`;}
-function wireIdx(id,I,ctx){const el=$(id);if(!el)return;const b=el.querySelector("[data-calsend]");if(!b)return;b.onclick=async()=>{const m=el.querySelector("[data-calmsg]"),nv=+el.querySelector("[data-calniv]").value;
-  try{await enqueue("calibracao",Object.assign({nivelApp:I.nivel,rotuloApp:I.label,nivelEquipe:nv,rotuloEquipe:NIVEIS[nv].n,concorda:nv===I.nivel,pontuacao:I.score,motivosConflito:I.conflito,motivosAmeaca:I.ameaca,observacao:el.querySelector("[data-calobs]").value.trim().slice(0,600),versao:I.versao},ctx()));
-    m.textContent=nv===I.nivel?"Obrigado. A concordância foi registrada.":"Obrigado. A diferença foi registrada e vai ajudar a ajustar o índice.";b.disabled=true;}catch(e){m.textContent=e.message||"Não foi possível guardar.";}};}
-function idxPDF(T,I){T(`Índice de ameaça de conflito (em calibração): ${I.label.toUpperCase()} · pressão ${I.score}/100`,11,"bold",I.nivel===2?[160,30,20]:I.nivel===1?[150,100,10]:[30,110,40]);
-  I.conflito.forEach(t=>T("• Conflito: "+t,9));I.ameaca.forEach(t=>T("• Ameaça: "+t,9));
-  if(!I.conflito.length&&!I.ameaca.length)T("Nenhum critério do índice apareceu nas bases consultadas. Isso não garante ausência de conflito.",9);
-  if(I.nivel===2&&!I.confirmado)T("Conflito provável: as bases indicam conflito, mas ainda não há confirmação da comunidade (registro de campo ou relato).",8.5,"italic",[70,78,72]);}
-function idxData(I){return {nivel:I.nivel,rotulo:I.label,pontuacao:I.score,confirmadoComunidade:I.confirmado,motivosConflito:I.conflito,motivosAmeaca:I.ameaca,perdaVegetacaoPP:I.perdaVeg,carAoVivo:I.carAoVivo,versao:I.versao};}
+  if(vl&&vl.pp>IDX.perdaConflito)C.push(`Desmatamento: perda de ${fmtN(vl.pp,1)} pontos percentuais de vegetação nativa entre ${vl.de} e ${vl.ate} (MapBiomas)`);
+  else if(vl&&vl.pp>=IDX.perdaAmeaca)A.push(`Desmatamento: perda de ${fmtN(vl.pp,1)} pontos percentuais de vegetação nativa entre ${vl.de} e ${vl.ate} (MapBiomas)`);
+  /* 5. registro comunitário de conflito ou de ameaça */
+  const base=C.length?2:A.length?1:0,rc=rcomIn(o);
+  rc.forEach(g=>(g.tipo==="conflito"?C:A).push(`Registro comunitário de ${g.tipo==="conflito"?"conflito":"ameaça"} (${new Date(g.criadoEm).toLocaleDateString("pt-BR")}): ${g.desc}`));
+  const nivel=C.length?2:A.length?1:0;
+  return {nivel,label:NIVEIS[nivel].n,nivelBases:base,conflito:C,ameaca:A,registros:rc.length,perdaVeg:vl?+vl.pp.toFixed(1):null,versao:"v2 (bases + registro comunitário)"};}
+function idxHTML(I,id){const N=NIVEIS[I.nivel];return `<section class="blk idx" id="${id}" style="--k:${N.c}"><h3>Conflito e ameaça territorial</h3>
+  <div class="idxbadge" style="background:${N.c}"><b>${esc(I.label)}</b></div>
+  ${I.conflito.length?`<p class="label">Qual conflito</p><ul class="idxl">${I.conflito.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}
+  ${I.ameaca.length?`<p class="label">${I.conflito.length?"Também há ameaça":"Qual ameaça"}</p><ul class="idxl">${I.ameaca.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}
+  ${!I.conflito.length&&!I.ameaca.length?`<p class="empty">Nenhum sinal de conflito ou ameaça nas bases consultadas e nenhum registro comunitário. Isso não garante que não haja: converse com a comunidade e, se for o caso, faça o registro abaixo.</p>`:""}
+  <details class="cal"><summary>Registro comunitário de conflito ou de ameaça</summary>
+   <p class="hintsmall" style="margin:6px 0">Use quando a comunidade relata um conflito ou uma ameaça neste local, inclusive o que as bases não mostram: cerca, grilagem, violência, desmatamento, água, agrotóxico, imóvel do CAR sobre o território etc. O registro entra na classificação acima e vai para o banco de dados.</p>
+   <label>A comunidade relata<select data-rctipo><option value="conflito">Conflito</option><option value="ameaca">Ameaça</option></select></label>
+   <label>Descreva qual é o conflito ou a ameaça<textarea data-rcdesc maxlength="600" rows="3" placeholder="Ex.: fazendeiro cercou a área de solta do fundo de pasto"></textarea></label>
+   <button type="button" class="btn sm primary" data-rcsend>Salvar registro comunitário</button><p class="msg" data-rcmsg role="status"></p></details>
+  <p class="hintsmall">Critérios das bases: conflito = mineração com lavra autorizada ou parque eólico/solar em operação ou obra a até ${IDX.conflitoKm} km (ou dentro do território), linha de transmissão existente cruzando o território, perda de vegetação nativa acima de ${IDX.perdaConflito} pontos em ${IDX.anosPerda} anos. Ameaça = processos minerários e projetos de energia a até ${IDX.ameacaKm} km (ou dentro do território), linha planejada, perda de vegetação de ${IDX.perdaAmeaca} a ${IDX.perdaConflito} pontos. Os registros comunitários dos últimos ${IDX.mesesRegistro} meses também contam.</p></section>`;}
+function wireIdx(id,I,ctx,redo){const el=$(id);if(!el)return;const b=el.querySelector("[data-rcsend]");if(!b)return;b.onclick=async()=>{const m=el.querySelector("[data-rcmsg]"),tp=el.querySelector("[data-rctipo]").value,desc=el.querySelector("[data-rcdesc]").value.trim().slice(0,600);
+  if(desc.length<5){m.textContent="Descreva qual é o conflito ou a ameaça.";return;}
+  const c=ctx(),nv=tp==="conflito"?2:1,g={id:uid(),tipo:tp,desc,lat:c.lat??null,lon:c.lon??null,terrId:c.territorioId||"",criadoEm:new Date().toISOString()};
+  try{await enqueue("calibracao",Object.assign({nivelApp:I.nivelBases,rotuloApp:NIVEIS[I.nivelBases].n,nivelEquipe:nv,rotuloEquipe:"Registro comunitário: "+(tp==="conflito"?"conflito":"ameaça"),concorda:nv===I.nivelBases,pontuacao:null,motivosConflito:I.conflito,motivosAmeaca:I.ameaca,observacao:desc,versao:I.versao},c));
+    RCOM=[g,...rcomAll()].slice(0,300);lsSet("ot_rcom",RCOM);m.textContent="Registro comunitário salvo e enviado.";b.disabled=true;if(redo)setTimeout(redo,700);}catch(e){m.textContent=e.message||"Não foi possível guardar.";}};}
+function idxPDF(T,I){T(`Classificação: ${I.label.toUpperCase()}`,11,"bold",I.nivel===2?[160,30,20]:I.nivel===1?[150,100,10]:[30,110,40]);
+  if(I.conflito.length){T("Qual conflito:",9.5,"bold");I.conflito.forEach(t=>T("• "+t,9));}
+  if(I.ameaca.length){T(I.conflito.length?"Também há ameaça:":"Qual ameaça:",9.5,"bold");I.ameaca.forEach(t=>T("• "+t,9));}
+  if(!I.conflito.length&&!I.ameaca.length)T("Nenhum sinal de conflito ou ameaça nas bases consultadas e nenhum registro comunitário. Isso não garante que não haja.",9);}
+function idxData(I){return {nivel:I.nivel,rotulo:I.label,pontuacao:null,registrosComunitarios:I.registros,motivosConflito:I.conflito,motivosAmeaca:I.ameaca,perdaVegetacaoPP:I.perdaVeg,versao:I.versao};}
 /* ---------- áreas protegidas: categorias e textos ---------- */
 const AP_GRP=[
  {k:"pi",t:"Unidades de conservação de proteção integral",f:x=>x.kind==="uc"&&x.grp==="PI",note:"Não admitem moradia nem exploração direta dos recursos naturais. Exceção: Monumento Natural e Refúgio de Vida Silvestre podem incluir terras particulares, se o uso for compatível. Mineração e grandes obras costumam ser proibidas ou depender de autorização do órgão gestor."},
@@ -551,8 +540,8 @@ function render(a){
   h+=`<section class="blk"><div class="row"><button type="button" class="btn primary" id="pdf">Gerar relatório em PDF</button><button type="button" class="btn" id="reg2">Registrar observação aqui</button></div><p class="msg" id="pdfmsg" role="status"></p></section>`;
   h+=`<section class="blk"><details><summary>Fontes e datas dos dados</summary><ul class="src">${SOURCES.map(s=>`<li>${s}</li>`).join("")}</ul></details></section></div>`;
   out.innerHTML=h;styleBlocks(out);
-  var ptCtx=()=>({modo:"ponto",lat:+a.y.toFixed(6),lon:+a.x.toFixed(6),raioKm:a.R,municipio:a.mun||""});wireIdx("idxpt",a.idx,ptCtx);
-  out.__a=a;var reIdx=()=>{const el=$("idxpt");if(!el||out.__a!==a)return;const op=el.querySelector("details.cal")&&el.querySelector("details.cal").open;a.idx=threatIndex({mode:"pt",a});el.outerHTML=idxHTML(a.idx,"idxpt");styleBlocks(out);wireIdx("idxpt",a.idx,ptCtx);if(op)$("idxpt").querySelector("details.cal").open=true;};
+  var ptCtx=()=>({modo:"ponto",lat:+a.y.toFixed(6),lon:+a.x.toFixed(6),raioKm:a.R,municipio:a.mun||""});wireIdx("idxpt",a.idx,ptCtx,()=>reIdx());
+  out.__a=a;var reIdx=()=>{const el=$("idxpt");if(!el||out.__a!==a)return;const op=el.querySelector("details.cal")&&el.querySelector("details.cal").open;a.idx=threatIndex({mode:"pt",a});el.outerHTML=idxHTML(a.idx,"idxpt");styleBlocks(out);wireIdx("idxpt",a.idx,ptCtx,()=>reIdx());};
   $("pdf").onclick=()=>makePDF(a);
   $("reg2").onclick=()=>{$("regPanel").scrollIntoView({behavior:"smooth",block:"start"});const t=$("rtexto");if(t)t.focus();};
   out.querySelectorAll("[data-usepct]").forEach(b=>b.onclick=()=>useCarPct(CARC.find(c=>c.cod===b.dataset.usepct)));
@@ -659,7 +648,7 @@ async function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent=
   T(`Coordenadas: ${a.y.toFixed(5)}, ${a.x.toFixed(5)}`,11,"bold");
   T(`${a.mun?"Município: "+a.mun+" (BA)":"Município não identificado"}   Raio: ${a.R} km   Data: ${a.when.toLocaleString("pt-BR")}   Origem do ponto: ${sel&&sel.how||""}`,10);
   const span=Math.max(a.R*3.2,6)/111;{pm.textContent="Montando o mapa do relatório…";const sn=await snapshotA({w:a.x-span/2,e:a.x+span/2,s:a.y-span/2,n:a.y+span/2},true);IMG(sn.img,"Mapa: o ponto consultado está no centro; o círculo tracejado mostra o raio de busca.");LEGEND(sn.leg,BASES[BASE].attr?"Fundo do mapa: "+BASES[BASE].attr+".":"");}
-  H2("Resumo");a.idx=threatIndex({mode:"pt",a});idxPDF(T,a.idx);summary(a).forEach(s=>T(`• ${s.b} ${s.t}`,10.5));
+  H2("Conflito e ameaça territorial");a.idx=threatIndex({mode:"pt",a});idxPDF(T,a.idx);H2("Resumo");summary(a).forEach(s=>T(`• ${s.b} ${s.t}`,10.5));
   H2("Mineração (ANM/SIGMINE)");const all=[...a.minIn,...a.minNear];
   if(!all.length)T(`Nenhum processo minerário a até ${a.R} km.`);else{T("Processos por etapa: "+Object.entries(STAGE).filter(([k])=>a.minStage[k]).map(([k,v])=>`${v.n}: ${a.minStage[k]}`).join("; ")+".");
     T("Lista completa dos processos no raio, com os mesmos campos do SIGMINE:",9.5);minTablePDF(TABLE,all,false);
@@ -740,12 +729,11 @@ function startTerritory(t){curT=Object.assign({saved:false},t);curT.bb=bboxR(cur
     <label>Tipo de comunidade<select id="ttipo">${TIPOS.map(x=>`<option${x===t.tipo?" selected":""}>${x}</option>`).join("")}</select></label>
     <label>Número do CEFIR / CAR (se houver)<input id="tcod" value="${esc(t.cod||"")}" placeholder="BA-0000000-…"></label>
     <label>Nome do titular ou responsável pelo CAR (se souber)<input id="tdono" value="${esc(t.dono||"")}" maxlength="160" placeholder="Para controle em caso de sobreposição"></label>
-    <label class="chk"><input type="checkbox" id="tconf"${t.conflito?" checked":""}> <span>A comunidade relata conflito ativo neste território (ameaça, cerca, despejo, obra ou mina em andamento).</span></label>
     <div class="row"><button type="button" class="btn sm" id="tkml">Baixar perímetro (KML)</button><button type="button" class="btn sm" id="tgeo">Baixar perímetro (GeoJSON)</button></div>
     <label class="chk"><input type="checkbox" id="tsave" checked> <span>Guardar este território e enviar para o banco de dados do projeto.</span></label>
     <div class="row"><button type="button" class="btn primary" id="tgo">Analisar território</button><button type="button" class="btn" id="tdiscard">Descartar</button></div>`;
   $("tkml").onclick=()=>dlPerimeter(Object.assign({},curT,{name:$("tnome").value.trim()||curT.name}),"kml");$("tgeo").onclick=()=>dlPerimeter(Object.assign({},curT,{name:$("tnome").value.trim()||curT.name}),"geojson");
-  $("tgo").onclick=async()=>{curT.name=$("tnome").value.trim()||"Território sem nome";curT.tipo=$("ttipo").value;curT.cod=$("tcod").value.trim();curT.dono=$("tdono").value.trim();curT.conflito=$("tconf").checked;
+  $("tgo").onclick=async()=>{curT.name=$("tnome").value.trim()||"Território sem nome";curT.tipo=$("ttipo").value;curT.cod=$("tcod").value.trim();curT.dono=$("tdono").value.trim();
     const sv=$("tsave"),doSave=sv&&sv.checked;tformEl.hidden=true;$("out").innerHTML=`<div class="loading"><span class="spin"></span>Cruzando as bases com o território…</div>`;$("out").scrollIntoView({behavior:"smooth",block:"start"});
     try{const r=await analyzeTerritory(curT);renderTerritory(r);if(doSave){tsay("Conferindo o CAR no SICAR antes de guardar…");await Promise.race([r.carP,new Promise(z=>setTimeout(z,45000))]);await saveTerritory(curT,r);}}catch(e){$("out").innerHTML=`<div class="placeholder"><p><strong>Não foi possível analisar o território.</strong></p><p>${esc(e.message||"")}</p></div>`;}};
   $("tdiscard").onclick=()=>{curT=null;tformEl.hidden=true;draw();tsay("");};
@@ -822,8 +810,8 @@ function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString
   h+=`<section class="blk"><div class="row">${!t.saved?`<button type="button" class="btn" id="tsave2">Guardar e enviar</button>`:""}<button type="button" class="btn primary" id="tpdf">Gerar relatório do território em PDF</button></div><p class="msg" id="tpdfmsg" role="status"></p></section>
     <section class="blk"><details><summary>Como foi calculado</summary><p class="src">O território foi coberto por ${fmtN(r.samples)} pontos de amostra, um a cada ${r.stepM} m aproximadamente, e cada ponto foi cruzado com as bases. CAR e uso da terra usam células de cerca de 220 m. Áreas e percentuais são aproximados.</p></details></section></div>`;
   out.innerHTML=h;styleBlocks(out);wireChart("chartT",r.series);
-  const tCtx=()=>({modo:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",municipio:r.mun.join(", "),conflitoRelatado:!!t.conflito});wireIdx("idxt",r.idx,tCtx);
-  r.reIdx=()=>{const el=$("idxt");if(!el)return;r.idx=threatIndex({mode:"terr",r});el.outerHTML=idxHTML(r.idx,"idxt");styleBlocks(out);wireIdx("idxt",r.idx,tCtx);};
+  const tCtx=()=>({modo:"territorio",...(()=>{const b=bboxR(t.rings),cx=(b.w+b.e)/2,cy=(b.s+b.n)/2,p=inPoly(cx,cy,t.rings)?[cx,cy]:t.rings[0][0];return {lon:+p[0].toFixed(6),lat:+p[1].toFixed(6)};})(),territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",municipio:r.mun.join(", "),conflitoRelatado:!!t.conflito});wireIdx("idxt",r.idx,tCtx,()=>r.reIdx());
+  r.reIdx=()=>{const el=$("idxt");if(!el)return;r.idx=threatIndex({mode:"terr",r});el.outerHTML=idxHTML(r.idx,"idxt");styleBlocks(out);wireIdx("idxt",r.idx,tCtx,()=>r.reIdx());};
   if(!r.lu30P){const bb=bboxR(t.rings);r.lu30P=lu30((x,y)=>inPoly(x,y,t.rings),bb,2025).catch(()=>null);}r.lu30P.then(L=>{r.lu30=L;const el=$("tlu30");if(el)el.innerHTML=L?lu30HTML(L,null,"do território"):"";});
   r.carP.then(L=>{r.carL=L&&!L.err?L:null;if(r.carL&&L.cov){r.car.pct=L.cov.IRU;r.car.ha=L.cov.IRU/100*r.area;r.car.live=true;if(r.reIdx)r.reIdx();const tr=$("tcarraster");if(tr)tr.remove();const ch=document.querySelector(".rep .chips .chip");if(ch){ch.className="chip "+(r.car.pct>=30?"in":r.car.pct>0?"near":"none");ch.querySelector("b").textContent=pf(r.car.pct);}}const el=$("tcarfull");if(!el)return;el.innerHTML=L&&!L.err?carListHTML({...L,list:L.list.filter(c=>c.cod!==t.cod)},true,t.cod||""):`<p class="warnbox">${L&&L.err==="offline"?"Sem internet: a lista completa dos cadastros sobrepostos é consultada no SICAR. Abaixo estão os coletivos e os grandes imóveis guardados no celular.":"Não foi possível buscar a lista completa no SICAR agora. Tente de novo mais tarde."}</p>`;if(L&&!L.err){CARLIST=L;draw();}});
  $("tpdf").onclick=()=>makeTerrPDF(r);const s2=$("tsave2");if(s2)s2.onclick=async()=>{await saveTerritory(t,r);renderTerritory(r);};}
@@ -834,7 +822,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   T(t.name,14,"bold");r.idx=threatIndex({mode:"terr",r});T(`${t.tipo||""} · ${fmtN(r.area,1)} ha · ${r.mun.join(", ")||"município não identificado"} (BA)${t.cod?" · "+t.cod:""}`,10);
   T(`Origem do limite: ${t.origem==="SICAR"?"cadastro coletivo no SICAR/CEFIR":t.origem==="desenho"?"desenhado no mapa":"arquivo enviado pela comunidade"} · Data: ${r.when.toLocaleString("pt-BR")}`,9,"normal",[90,99,93]);
   const bb=bboxR(t.rings),m=Math.max(bb.e-bb.w,bb.n-bb.s)*0.25+0.01;{pm.textContent="Montando o mapa do relatório…";const sn=await snapshotA({w:bb.w-m,e:bb.e+m,s:bb.s-m,n:bb.n+m},false);IMG(sn.img,"Mapa do território e das sobreposições.");LEGEND(sn.leg,BASES[BASE].attr?"Fundo do mapa: "+BASES[BASE].attr+".":"");}
-  H2("Índice de ameaça de conflito");idxPDF(T,r.idx);
+  H2("Conflito e ameaça territorial");idxPDF(T,r.idx);
   H2("CAR / CEFIR");if(t.cod)T(`CAR/CEFIR do território: ${t.cod}${t.dono?" · titular ou responsável informado: "+t.dono:""}`,10,"bold");else if(t.dono)T(`Titular ou responsável informado: ${t.dono}`,10,"bold");if(r.carL&&r.carL.cov)carResumoPDF(T,r.carL,true,t.cod||"");else T(`Pela cópia guardada no app (células de 220 m), ${P(r.car.pct)} do território (cerca de ${fmtN(r.car.ha)} ha) tem imóvel do CAR declarado. Não foi possível confirmar no SICAR.`,10);
   if(r.carL&&r.carL.list.length){const L={...r.carL,list:r.carL.list.filter(c=>c.cod!==t.cod)};T(`${fmtN(L.list.length)} cadastro(s) do CAR se sobrepõem ao território (consulta ao SICAR em ${r.carL.when.toLocaleString("pt-BR")}). A coluna "% do território" mostra a parte do território coberta por cada um.`,9.5);carTablePDF(TABLE,L,true);}
   r.car.big.forEach(b=>T(`Grande imóvel ${b.cod} (${fmtN(b.area)} ha, ${b.mf} MF): cobre cerca de ${fmtN(b.ha)} ha (${P(b.pct)}) do território.`,9.5));
@@ -855,7 +843,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),indice:idxData(r.idx),conflitoRelatado:!!t.conflito,carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.5.0";
+const VER="1.6.0";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
