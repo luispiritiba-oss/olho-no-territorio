@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Olho no Território Bahia</title>
 <meta name="description" content="Consulta de mineração, energia, CAR/CEFIR, áreas protegidas e uso da terra em qualquer ponto da Bahia, com registros de campo.">
-<meta name="theme-color" content="#0d6a52">
+<meta name="theme-color" content="#e6f5ee">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -18,26 +18,24 @@
 [hidden]{display:none!important}
 /* Layout: one-column field tool for phones. Map on top, consultation and community panels below; on wide screens map left, panels right. */
 :root{
-  --paper:#f2f3ee; --card:#fbfbf8; --ink:#1b211e; --mute:#5a635d; --line:#d3d8cd;
-  --accent:#0d6a52; --accent-ink:#ffffff; --accent-soft:#dcebe4;
-  --alert:#b0261d; --alert-soft:#f6dedb; --warn:#9a5b00; --warn-soft:#f6e7cc; --ok:#2e6a39; --ok-soft:#dfeedd;
-  --mapbg:#e7e9e1; --mapline:#8d958c; --mapmask:rgba(231,233,225,.93);
+  --paper:#f4f8f6; --card:#ffffff; --ink:#1d2622; --mute:#5b6862; --line:#dde6e1;
+  --accent:#16805f; --accent-ink:#ffffff; --accent-soft:#e3f3ec; --accent-2:#5cc39a;
+  --alert:#b3261e; --alert-soft:#fbe9e7; --warn:#93570a; --warn-soft:#fdf1dc; --ok:#2e6a39; --ok-soft:#e6f4e6;
+  --pct:#00796b; --pct-soft:#e0f4f1;
+  --mapbg:#eef3ef; --mapline:#97a39b; --mapmask:rgba(244,248,246,.9);
+  --shadow:0 1px 2px rgba(20,40,30,.05),0 4px 14px rgba(20,40,30,.06);
   --f-display:"Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
   --f-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --paper:#141816; --card:#1c211e; --ink:#e9ece6; --mute:#a3ada5; --line:#323a35;
-  --accent:#4fbf98; --accent-ink:#06261c; --accent-soft:#1d3a30;
-  --alert:#ff8a7f; --alert-soft:#43201d; --warn:#f2b45a; --warn-soft:#3b2c14; --ok:#8fd19b; --ok-soft:#1f3423;
-  --mapbg:#202622; --mapline:#5f6a63; --mapmask:rgba(20,24,22,.92); color-scheme:dark}}
 :root[data-theme="dark"]{
   --paper:#141816; --card:#1c211e; --ink:#e9ece6; --mute:#a3ada5; --line:#323a35;
   --accent:#4fbf98; --accent-ink:#06261c; --accent-soft:#1d3a30;
   --alert:#ff8a7f; --alert-soft:#43201d; --warn:#f2b45a; --warn-soft:#3b2c14; --ok:#8fd19b; --ok-soft:#1f3423;
   --mapbg:#202622; --mapline:#5f6a63; --mapmask:rgba(20,24,22,.92); color-scheme:dark}
 *{box-sizing:border-box}
-body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;margin:0}
+body{background:linear-gradient(180deg,#e6f5ee 0,var(--paper) 340px) no-repeat,var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;margin:0}
 .wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 20px;margin-bottom:12px}
 h1{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,6vw,40px);line-height:1;margin:0;letter-spacing:-.02em;text-wrap:balance}
@@ -46,25 +44,24 @@ h1{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,6vw,40px);l
 .grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
 .col{display:flex;flex-direction:column;gap:18px;min-width:0}
-.panel{background:var(--card);border:1px solid var(--line);border-radius:14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 .mapbox{position:relative;overflow:hidden}
 @media (min-width:861px){.mapbox{position:sticky;top:12px}}
 canvas#map{display:block;width:100%;height:min(60vh,580px);min-height:330px;touch-action:none;cursor:crosshair;border-radius:14px 14px 0 0;background:var(--mapbg)}
 .mapctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
-.mapctl button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:20px;font-weight:700;cursor:pointer}
-.maphint{position:absolute;left:10px;top:10px;background:var(--card);border:1px solid var(--line);padding:6px 10px;border-radius:10px;font-size:13px;color:var(--mute);max-width:70%}
+.mapctl button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow);padding:0}
+.mapctl button svg{width:22px;height:22px}
+.mapctl .sep{height:4px}
+.maphint{position:absolute;left:10px;top:10px;background:var(--card);border:1px solid var(--line);padding:6px 10px;border-radius:10px;font-size:13px;color:var(--mute);max-width:70%;box-shadow:var(--shadow)}
+.maphint.pct{background:var(--pct);border-color:var(--pct);color:#fff;font-weight:700}
 .mapload{position:absolute;left:10px;bottom:10px;background:var(--card);border:1px solid var(--line);padding:4px 10px;border-radius:10px;font-size:12px;color:var(--mute)}
-.legend{padding:12px 14px;display:flex;flex-wrap:wrap;gap:6px}
-.lg{display:inline-flex;align-items:center;gap:7px;font-size:13px;border:1px solid var(--line);border-radius:99px;padding:4px 10px 4px 8px;background:transparent;color:var(--ink);cursor:pointer;font-family:inherit}
-.lg[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
-.sw{width:14px;height:14px;border-radius:4px;flex:none}
 .ask{padding:16px;display:flex;flex-direction:column;gap:12px}
 .ask h2,.rep h2{font-family:var(--f-display);font-weight:800;font-size:22px;margin:0;letter-spacing:-.01em}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .btn{font-family:inherit;font-size:16px;font-weight:700;border-radius:12px;padding:12px 16px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;min-height:48px}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.sm{min-height:38px;padding:7px 11px;font-size:14px}
-.btn:focus-visible,.lg:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn:focus-visible,.lg:focus-visible,.seg button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 input,select,textarea{font-family:inherit;font-size:16px;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:var(--paper);color:var(--ink);min-height:48px;max-width:100%}
 textarea{min-height:90px;resize:vertical;width:100%}
@@ -149,7 +146,6 @@ footer.note{margin-top:18px;font-size:13px;color:var(--mute);max-width:80ch}
 .rep section.blk h3{display:flex;align-items:center;gap:8px;color:var(--k)}
 .rep section.blk h3::before{content:"";width:12px;height:12px;border-radius:3px;background:var(--k);flex:none}
 .rep section.blk.k-min{--k:#b0261d}.rep section.blk.k-en{--k:#1f4fbf}.rep section.blk.k-ter{--k:#2e7d32}.rep section.blk.k-car{--k:#5b6f8c}.rep section.blk.k-lu{--k:#8a6d00}.rep section.blk.k-act{--k:var(--accent);border-top-width:1px}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rep section.blk.k-min{--k:#ff8a7f}:root:not([data-theme="light"]) .rep section.blk.k-en{--k:#8fb0ff}:root:not([data-theme="light"]) .rep section.blk.k-ter{--k:#8fd19b}:root:not([data-theme="light"]) .rep section.blk.k-car{--k:#a9bad3}:root:not([data-theme="light"]) .rep section.blk.k-lu{--k:#f2c85a}}
 /* cartão do imóvel do CAR */
 .carcard{border:1px solid var(--line);border-left:5px solid #5b6f8c;border-radius:12px;padding:10px 12px;background:var(--paper);display:flex;flex-direction:column;gap:6px}
 .carcard p{margin:0}
@@ -181,18 +177,73 @@ figure.chart figcaption{font-weight:700;font-size:15px;margin-bottom:6px}
 .cwrap .cx{stroke:var(--mute);stroke-width:1;stroke-dasharray:3 3}
 .ctip{position:absolute;top:0;width:170px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:12px;display:flex;flex-direction:column;gap:2px;box-shadow:0 4px 12px rgba(0,0,0,.12);pointer-events:none}
 .ctip span{display:flex;align-items:center;gap:6px}
-.bases{display:flex;gap:6px;padding:10px 14px 0;flex-wrap:wrap}
-.bases::before{content:"Fundo:";font-size:12px;font-weight:700;color:var(--mute);align-self:center;text-transform:uppercase;letter-spacing:.06em}
-.bases button{font-family:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 12px;cursor:pointer;min-height:36px}
-.bases button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
 .mapattr{position:absolute;right:6px;bottom:auto;font-size:10px;background:rgba(255,255,255,.8);color:#333;padding:1px 6px;border-radius:6px;max-width:70%;text-align:right}
-.mbyr{display:flex;align-items:center;gap:8px;padding:8px 14px 0;font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
-.mbyr select{min-height:36px;padding:4px 8px;font-size:14px;text-transform:none;letter-spacing:0}
 .aph{margin:10px 0 2px;font-weight:700;font-size:14px;color:var(--ink)}.aph span{color:var(--mute);font-weight:400}.apn{font-size:12.5px!important;color:var(--mute)!important;margin:2px 0 6px!important}
 .idxbadge{display:flex;align-items:baseline;gap:10px;color:#fff;border-radius:10px;padding:10px 14px;margin:4px 0 8px}.idxbadge b{font-size:19px}.idxbadge span{font-size:13px;opacity:.92}
 .idxl{margin:2px 0 8px;padding-left:20px;font-size:14px}.idxl li{margin:2px 0}
 details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:6px 10px}details.cal summary{cursor:pointer;font-weight:600;font-size:14px}details.cal label{display:block;margin:6px 0;font-size:14px}details.cal select,details.cal textarea{width:100%;font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--card,#fff);color:inherit;box-sizing:border-box}
 .terrsub{display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:10px 0;margin:4px 0}
+
+/* ---------- barra abaixo do mapa (v1.7) ---------- */
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.tools{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 14px 4px;border-top:1px solid var(--line)}
+.tools .tl{font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px}
+.seg{display:inline-flex;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px}
+.seg button{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:14px;border:0;background:transparent;color:var(--ink);border-radius:9px;padding:7px 10px;min-height:38px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg button svg.i{width:18px;height:18px}
+.yr select{min-height:42px;padding:6px 10px;font-size:15px;border-radius:12px;background:var(--paper)}
+.layers{padding:6px 14px 14px}
+.layers>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;font-weight:700}
+.layers>summary::-webkit-details-marker{display:none}
+.layers>summary .chev{transition:transform .2s}.layers[open]>summary .chev{transform:rotate(180deg)}
+.layers>summary .cnt{font-weight:400;color:var(--mute);font-size:14px}
+.layers>summary .sp{flex:1}
+.lgrp{margin-top:6px}
+.lgrp h4{margin:6px 0 6px;font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.lg{display:flex;align-items:center;gap:8px;font-family:inherit;font-size:13.5px;line-height:1.2;text-align:left;border:1px solid var(--line);border-radius:12px;padding:7px 9px;background:var(--card);color:var(--ink);cursor:pointer;min-height:46px;width:100%}
+.lg .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,white);color:var(--c);flex:none}
+.lg .ic svg.i{width:18px;height:18px}
+.lg .t{flex:1;min-width:0}
+.lg .ck{width:18px;height:18px;border-radius:5px;border:2px solid var(--line);display:grid;place-items:center;flex:none;color:#fff}
+.lg .ck svg{width:12px;height:12px;stroke-width:3.2;opacity:0}
+.lg[aria-pressed="true"]{border-color:color-mix(in srgb,var(--c) 45%,var(--line));background:color-mix(in srgb,var(--c) 5%,white)}
+.lg[aria-pressed="true"] .ck{background:var(--accent);border-color:var(--accent)}.lg[aria-pressed="true"] .ck svg{opacity:1}
+.lg[aria-pressed="false"]{color:var(--mute)}.lg[aria-pressed="false"] .ic{background:var(--paper);color:#9aa59f}
+.lg .net{font-size:11px;color:var(--mute);display:block;font-weight:400}
+.lall{display:flex;gap:6px}.lall button{font-family:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 10px;cursor:pointer;color:var(--ink)}
+/* busca por nome */
+.search{position:relative}
+.search .ib{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:0 10px}
+.search .ib:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.search .ib input{border:0;background:transparent;flex:1;min-width:0;outline:none;padding-left:0}
+.sres{list-style:none;margin:6px 0 0;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:var(--shadow);max-height:340px;overflow:auto}
+.sres li button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;font-family:inherit;font-size:15px;background:transparent;border:0;border-bottom:1px solid var(--line);padding:9px 12px;cursor:pointer;color:var(--ink)}
+.sres li:last-child button{border-bottom:0}
+.sres li button:hover,.sres li button:focus-visible{background:var(--accent-soft);outline:none}
+.sres .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,white);color:var(--c);flex:none}
+.sres .ic svg.i{width:18px;height:18px}
+.sres b{display:block;font-weight:700}.sres small{color:var(--mute);font-size:13px}
+.sres .none{padding:10px 12px;color:var(--mute);font-size:14px}
+/* aviso de CEFIR coletivo */
+.pctalert{display:flex;gap:12px;align-items:flex-start;background:var(--pct-soft);border:2px solid var(--pct);border-radius:14px;padding:12px 14px;color:#063b35}
+.pctalert .ic{width:40px;height:40px;border-radius:12px;background:var(--pct);color:#fff;display:grid;place-items:center;flex:none}
+.pctalert .ic svg.i{width:24px;height:24px}
+.pctalert h3{margin:0 0 4px;font-family:var(--f-display);font-size:18px;color:var(--pct)}
+.pctalert p{margin:2px 0;font-size:14px}
+.pctalert .row{margin-top:8px}
+/* queimadas e desmatamento */
+.rep section.blk.k-fire{--k:#d9480f}
+.fstat{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.fstat div{background:var(--paper);border-radius:10px;padding:8px 10px}.fstat b{display:block;font-family:var(--f-display);font-size:20px;line-height:1.15}.fstat span{font-size:12.5px;color:var(--mute)}
+.mbxh{display:flex;align-items:center;gap:8px;margin:6px 0 2px;font-weight:700;font-size:16px}
+.mbxh .ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff;flex:none}
+.mbxh .ic svg.i{width:17px;height:17px}
+.bchart svg{width:100%;height:auto;display:block}
+.bchart .ct{fill:var(--mute);font-size:12px;font-family:var(--f-body)}
+.bchart .cg{stroke:var(--line);stroke-width:1}
+.prog{font-size:13px;color:var(--mute)}
 </style>
 
 </head>
@@ -220,13 +271,18 @@ details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:
       <div class="maphint" id="hint">Carregando o mapa da Bahia…</div>
       <div class="mapload" id="mapload" hidden></div>
       <div class="mapctl">
-        <button type="button" id="zin" aria-label="Aproximar">+</button>
-        <button type="button" id="zout" aria-label="Afastar">−</button>
-        <button type="button" id="zall" aria-label="Ver a Bahia toda" style="font-size:14px">BA</button>
+        <button type="button" id="zin" aria-label="Aproximar" title="Aproximar"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" id="zout" aria-label="Afastar" title="Afastar"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <span class="sep"></span>
+        <button type="button" id="zme" aria-label="Ir para minha localização" title="Minha localização"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+        <button type="button" id="zall" aria-label="Ver a Bahia toda" title="Ver a Bahia toda"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
       </div>
       <div class="mapattr" id="mapattr" hidden></div>
-      <div class="bases" id="bases" role="group" aria-label="Fundo do mapa"></div>
-      <div class="legend" id="legend" aria-label="Camadas do mapa"></div>
+      <div class="tools">
+        <div><span class="tl" id="baseslbl">Fundo do mapa</span><div class="seg" id="bases" role="group" aria-labelledby="baseslbl"></div></div>
+        <div class="yr"><label class="tl" for="mbyear">Ano dos mapas MapBiomas</label><select id="mbyear"></select></div>
+      </div>
+      <details class="layers" id="legend" open></details>
     </div>
 
     <div class="col">
@@ -249,6 +305,11 @@ details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:
             <option value="5" selected>5 km</option>
             <option value="10">10 km</option>
           </select>
+        </div>
+        <label class="label" for="tbusca">Buscar território tradicional pelo nome</label>
+        <div class="search">
+          <div class="ib"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="tbusca" type="search" autocomplete="off" placeholder="Terra indígena, quilombo, fundo de pasto, assentamento…" aria-controls="tbres"></div>
+          <ul class="sres" id="tbres" hidden></ul>
         </div>
         <label class="label" for="mun">Ir para um município</label>
         <div class="row">
@@ -315,8 +376,8 @@ details.cal{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="config.js?v=155"></script>
-<script src="app.js?v=155"></script>
+<script src="config.js?v=170"></script>
+<script src="app.js?v=170"></script>
 <script>
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
 let deferredInstall=null;const ib=document.getElementById("install");
