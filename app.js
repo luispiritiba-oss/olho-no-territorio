@@ -164,7 +164,7 @@ const cv=$("map"), ctx=cv.getContext("2d");
 let view=Object.assign({},VIEW_BA), sel=null, R=5, W=0, H=0, DPR=1;
 const LAYERS=[
   {id:"lu",n:"Uso da terra (MapBiomas)",sw:"linear-gradient(90deg,#7dc975 50%,#edde8e 50%)",on:true},
-  {id:"fogo",n:"Queimadas no ano (MapBiomas)",sw:"#ff5340",on:false,net:true},
+  {id:"fogo",n:"Queimadas no ano (MapBiomas)",sw:"#ffd000",on:false,net:true},
   {id:"desm",n:"Desmatamento no ano (MapBiomas)",sw:"#ea1c1c",on:false,net:true},
   {id:"car",n:"Imóveis do CAR (SICAR)",sw:"#5b6f8c",on:true},
   {id:"min",n:"Mineração (ANM)",sw:STAGE.ex.c,on:true},
@@ -251,7 +251,7 @@ function drawNow(c,opts){
     else for(const t of visTiles()) if(t.luImg) c.drawImage(t.luImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));
     c.restore();}
   for(const t of ["desm","fogo"]){if(!on(t)||!navigator.onLine)continue;const M=MBX[t];if(MBYEAR<M.y0)continue;const yr=Math.min(M.y1,MBYEAR);const u=mbxUrlNow(t,yr);
-    if(!u){if(!opts.noLoad)mbxUrl(t,yr).catch(()=>{});continue;}c.save();c.globalAlpha=.95;c.imageSmoothingEnabled=false;drawXYZ(c,u,zoomFor(view,W,opts.scale||DPR,14),opts);c.restore();}
+    if(!u){if(!opts.noLoad)mbxUrl(t,yr).catch(()=>{});continue;}c.save();c.globalAlpha=.95;c.imageSmoothingEnabled=false;drawXYZ(c,u,zoomFor(view,W,opts.scale||DPR,14),opts,t==="fogo"?FIRE_RGB:null);c.restore();}
   if(on("car")&&(detail||opts.forceCar)){const live=opts.forceCar||(vw()<=CARWMS_MAX&&navigator.onLine);if(live&&!opts.noLoad)requestCarWms();
     if(live&&carWms&&bbOv(carWms.v,view)){c.drawImage(carWms.img,px(carWms.v.w),py(carWms.v.n),px(carWms.v.e)-px(carWms.v.w),py(carWms.v.s)-py(carWms.v.n));}
     else{c.save();c.globalAlpha=.35;c.imageSmoothingEnabled=false;for(const t of visTiles()) if(t.carImg) c.drawImage(t.carImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));c.restore();}}
@@ -309,7 +309,7 @@ function fitTo(bb,m){const w=(bb.e-bb.w),h=(bb.n-bb.s);m=m==null?Math.max(w,h)*0
 function centerOn(x,y,spanDeg){const h=spanDeg/2;view={w:x-h,e:x+h,s:y-h,n:y+h};fitAspect();}
 const lgEl=$("legend");
 const LGROUPS=[["Ameaças e pressões",["min","en","lt","fogo","desm","big"]],["Povos, comunidades e áreas protegidas",["ter","pct","ti","qu","uc","as","sa"]],["Base do mapa",["lu","car","mu"]]];
-const LCOL={lu:"#3f9a4a",car:"#5b6f8c",min:"#9c0027",en:"#1f4fbf",lt:"#3a3f3c",fogo:"#e8590c",desm:"#c92a2a",big:"#37474f",ter:"#d81b60",pct:"#00897b",ti:"#a0522d",qu:"#7b3fa0",uc:"#2e7d32",as:"#c27c0e",sa:"#7a4b2a",mu:"#6f7a73"};
+const LCOL={lu:"#3f9a4a",car:"#5b6f8c",min:"#9c0027",en:"#1f4fbf",lt:"#3a3f3c",fogo:"#e67700",desm:"#c92a2a",big:"#37474f",ter:"#d81b60",pct:"#00897b",ti:"#a0522d",qu:"#7b3fa0",uc:"#2e7d32",as:"#c27c0e",sa:"#7a4b2a",mu:"#6f7a73"};
 function setLayer(id,v){const l=LAYERS.find(x=>x.id===id);if(!l)return;l.on=v;const b=lgEl.querySelector(`.lg[data-id="${id}"]`);if(b)b.setAttribute("aria-pressed",String(v));updLayerCount();}
 function updLayerCount(){const el=$("lgcnt");if(el)el.textContent=`${LAYERS.filter(l=>l.on).length} de ${LAYERS.length} ligadas`;}
 function initLegend(){lgEl.innerHTML=`<summary><svg class="i" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/><path d="M3 17.5l9 5 9-5" opacity=".5"/></svg>Camadas do mapa <span class="cnt" id="lgcnt"></span><span class="sp"></span><svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary>
@@ -604,7 +604,7 @@ async function snapshotA(bb,selPt){const S=900;const cx=(bb.w+bb.e)/2,cy=(bb.s+b
   const sv={w:cx-span/2/kx,e:cx+span/2/kx,s:cy-span/2/KY,n:cy+span/2/KY};
   await ensure(sv.w,sv.s,sv.e,sv.n).catch(()=>{});await preloadBase(sv,S,9000).catch(()=>{});
   if(on("lu")&&navigator.onLine){try{const tpl=await mbUrl(MBYEAR);const z=zoomFor(sv,S,1,14);const tl=baseTilesFor(sv,z);if(tl.length<=120)await Promise.race([Promise.all(tl.map(([x,y])=>baseTile(turl(tpl,z,x,y)).p)),new Promise(r=>setTimeout(r,10000))]);}catch(e){}}
-  for(const t of ["fogo","desm"]){if(!on(t)||!navigator.onLine||MBYEAR<MBX[t].y0)continue;try{const tpl=await mbxUrl(t,Math.min(MBX[t].y1,MBYEAR));const z=zoomFor(sv,S,1,14);const tl=baseTilesFor(sv,z);if(tl.length<=120)await Promise.race([Promise.all(tl.map(([x,y])=>baseTile(turl(tpl,z,x,y)).p)),new Promise(r=>setTimeout(r,10000))]);}catch(e){}}
+  for(const t of ["fogo","desm"]){if(!on(t)||!navigator.onLine||MBYEAR<MBX[t].y0)continue;try{const tpl=await mbxUrl(t,Math.min(MBX[t].y1,MBYEAR));const z=zoomFor(sv,S,1,14);const tl=baseTilesFor(sv,z);if(tl.length<=120)await Promise.race([Promise.all(tl.map(([x,y])=>(t==="fogo"?recolTile(turl(tpl,z,x,y),FIRE_RGB):baseTile(turl(tpl,z,x,y))).p)),new Promise(r=>setTimeout(r,10000))]);}catch(e){}}
   let wms=null;if(on("car")&&(sv.e-sv.w)<=CARWMS_MAX*1.5&&navigator.onLine){wms=await Promise.race([carWmsImage(sv,S,S).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),12000))]);}
   const off=document.createElement("canvas");off.width=S;off.height=S;const c=off.getContext("2d");const keep={view,W,H,sel,carWms};W=S;H=S;view=sv;carWms=wms;
   if(!selPt)sel=null;let ok=true;
@@ -631,7 +631,7 @@ function legendItems(bb,selPt,carLive){const it=[];const any=(arr)=>arr.some(o=>
   if(on("sa")&&SA.some(s=>bbOv(s.bb,bb)))it.push({k:"dot",c:"#7a4b2a",n:"Sítio arqueológico"});
   if(on("ter")&&REGS.some(r=>r.lon>=bb.w&&r.lon<=bb.e&&r.lat>=bb.s&&r.lat<=bb.n))it.push({k:"dot",c:"#d81b60",n:"Registro de campo"});
   if(on("mu"))it.push({k:"line",c:"#8d958c",n:"Limite municipal"});
-  if(on("fogo")&&MBYEAR>=MBX.fogo.y0)it.push({k:"fill",c:"#ff5340",a:.9,n:`Área queimada em ${Math.min(MBX.fogo.y1,MBYEAR)} (MapBiomas Fogo)`});
+  if(on("fogo")&&MBYEAR>=MBX.fogo.y0)it.push({k:"fill",c:FIRE_HEX,a:1,s:"#c99a00",n:`Área queimada em ${Math.min(MBX.fogo.y1,MBYEAR)} (MapBiomas Fogo)`});
   if(on("desm")&&MBYEAR>=MBX.desm.y0){const y=Math.min(MBX.desm.y1,MBYEAR);it.push({k:"fill",c:"#ea1c1c",a:.9,n:`Desmatamento de vegetação primária em ${y}`});it.push({k:"fill",c:"#fe9934",a:.9,n:`Desmatamento de vegetação secundária em ${y}`});}
   if(on("lu")){const st=rasterInPoly("lu",[[[bb.w,bb.s],[bb.e,bb.s],[bb.e,bb.n],[bb.w,bb.n],[bb.w,bb.s]]],bb);const tot=st.tot||1;
     [...st.cnt.entries()].filter(([k])=>k<250).sort((a,b)=>b[1]-a[1]).filter(([,n])=>n/tot>0.01).slice(0,10).forEach(([k,n])=>it.push({k:"fill",c:"#"+LEG[k][1],a:.75,n:"Uso da terra: "+luName(LEG[k][0])+` (${Math.round(n/tot*100)}% do mapa)`}));}
@@ -1208,10 +1208,16 @@ function mbUrl(y){const c=MBURL.get(y);if(c&&Date.now()-c.t<3*3600e3)return c.ur
   MBURL.set(y,{p,t:Date.now()});p.catch(()=>MBURL.delete(y));return p;}
 const mbUrlNow=y=>{const c=MBURL.get(y);return c&&c.url||null;};
 function zoomFor(v,w,dpr,max){const ppd=w/(v.e-v.w);return Math.max(4,Math.min(max,Math.round(Math.log2(ppd*360/256*Math.min(dpr||1,2)))));}
-function drawXYZ(c,tpl,z,opts){const tl=baseTilesFor(view,z);if(tl.length>400)return;
-  for(const [x,y] of tl){const u=turl(tpl,z,x,y);const t=opts.noLoad?BT.get(u):baseTile(u);
+function drawXYZ(c,tpl,z,opts,rc){const tl=baseTilesFor(view,z);if(tl.length>400)return;const get=rc?(u=>recolTile(u,rc)):baseTile,peek=rc?(u=>RT.get(u)):(u=>BT.get(u));
+  for(const [x,y] of tl){const u=turl(tpl,z,x,y);const t=opts.noLoad?peek(u):get(u);
     if(t&&t.ok){drawTilePart(c,t.img,0,0,256,x,y,z,8);continue;}
-    for(let d=1;d<=5;d++){const f=2**d,ptx=Math.floor(x/f),pty=Math.floor(y/f),pt=BT.get(turl(tpl,z-d,ptx,pty));if(pt&&pt.ok){const sw=256/f;drawTilePart(c,pt.img,(x-ptx*f)*sw,(y-pty*f)*sw,sw,x,y,z,4);break;}}}}
+    for(let d=1;d<=5;d++){const f=2**d,ptx=Math.floor(x/f),pty=Math.floor(y/f),pt=peek(turl(tpl,z-d,ptx,pty));if(pt&&pt.ok){const sw=256/f;drawTilePart(c,pt.img,(x-ptx*f)*sw,(y-pty*f)*sw,sw,x,y,z,4);break;}}}}
+/* quadrícula recolorida (queimadas em amarelo-fogo, para não confundir com o vermelho do desmatamento) */
+const RT=new Map();
+function recolTile(url,rgb){let t=RT.get(url);if(t)return t;t={ok:false};t.p=new Promise(res=>{const im=new Image();im.crossOrigin="anonymous";im.onload=()=>{try{const cv2=document.createElement("canvas");cv2.width=256;cv2.height=256;const g=cv2.getContext("2d");g.drawImage(im,0,0,256,256);const d=g.getImageData(0,0,256,256);const q=d.data;
+    for(let i=0;i<q.length;i+=4){if(q[i+3]<60){q[i+3]=0;continue;}q[i]=rgb[0];q[i+1]=rgb[1];q[i+2]=rgb[2];q[i+3]=255;}g.putImageData(d,0,0);t.img=cv2;t.ok=true;}catch(e){t.img=im;t.ok=true;}res(t);draw();};im.onerror=()=>{t.err=true;res(t);};im.src=url;});
+  RT.set(url,t);if(RT.size>500){for(const k of RT.keys()){RT.delete(k);if(RT.size<=400)break;}}return t;}
+const FIRE_RGB=[255,208,0],FIRE_HEX="#ffd000";
 const MBPAL=Object.entries(MBC).filter(([v])=>+v!==27).map(([v,a])=>[+v,parseInt(a[1].slice(0,2),16),parseInt(a[1].slice(2,4),16),parseInt(a[1].slice(4,6),16)]);
 const mbMemo=new Map();function mbCls(r,g,b){const k=(r<<16)|(g<<8)|b;let v=mbMemo.get(k);if(v!==undefined)return v;let best=0,bd=55*55;for(const [pv,R,G,B0] of MBPAL){const d=(r-R)**2+(g-G)**2+(b-B0)**2;if(d<bd){bd=d;best=pv;}}mbMemo.set(k,best);return best;}
 const MBTD=new Map();
@@ -1257,7 +1263,7 @@ function ICON(id){const P={
 
 /* ---------- MapBiomas: queimadas (Fogo Col. 5, sobre a Col. 11) e desmatamento (Col. 11, Perda de Vegetação Nativa) ---------- */
 const MBX={
-  fogo:{n:"Queimadas",sk:"fogo-copia-1h7mac_annual-t5v51p",lk:"total-burned-2yo2gt",pv:[1],cls:{1:["Área queimada","ff5340"]},y0:1985,y1:2025,
+  fogo:{n:"Queimadas",sk:"fogo-copia-1h7mac_annual-t5v51p",lk:"total-burned-2yo2gt",pv:[1],cls:{1:["Área queimada","f59f00"]},y0:1985,y1:2025,
     src:"MapBiomas Fogo, Coleção 5 (área queimada anual, 30 m, sobre a Coleção 11)"},
   desm:{n:"Desmatamento",sk:"desmatamento-copia-12xxov_annual-c5i7xj",lk:"deforestation-omgdf4",pv:[4,6],cls:{4:["Vegetação primária (nunca desmatada antes)","ea1c1c"],6:["Vegetação secundária (que tinha se regenerado)","fe9934"]},y0:1987,y1:2025,
     src:"MapBiomas Coleção 11, Perda de Vegetação Nativa (desmatamento anual, 30 m)"}};
