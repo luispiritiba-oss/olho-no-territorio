@@ -164,8 +164,8 @@ const cv=$("map"), ctx=cv.getContext("2d");
 let view=Object.assign({},VIEW_BA), sel=null, R=5, W=0, H=0, DPR=1;
 const LAYERS=[
   {id:"lu",n:"Uso da terra (MapBiomas)",sw:"linear-gradient(90deg,#7dc975 50%,#edde8e 50%)",on:true},
-  {id:"fogo",n:"Queimadas no ano (MapBiomas)",sw:"#ffd000",on:false,net:true},
-  {id:"desm",n:"Desmatamento no ano (MapBiomas)",sw:"#ea1c1c",on:false,net:true},
+  {id:"fogo",n:"Queimadas no ano (MapBiomas)",sw:"#ffd000",on:false},
+  {id:"desm",n:"Desmatamento no ano (MapBiomas)",sw:"#ea1c1c",on:false},
   {id:"car",n:"Imóveis do CAR (SICAR)",sw:"#5b6f8c",on:true},
   {id:"min",n:"Mineração (ANM)",sw:STAGE.ex.c,on:true},
   {id:"en",n:"Eólicas e solares",sw:"#1f4fbf",on:true},
@@ -1414,20 +1414,32 @@ function buildSearch(){const it=[];
 /* busca aproximada: ignora acentos e aceita pequenos erros de digitação em cada palavra */
 function lev1(a,b,max){if(Math.abs(a.length-b.length)>max)return max+1;let prev=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const cur=[i];let mn=i;for(let j=1;j<=b.length;j++){cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));if(cur[j]<mn)mn=cur[j];}if(mn>max)return max+1;prev=cur;}return prev[b.length];}
 const STOP=new Set(["de","da","do","das","dos","e","a","o"]);
-function wordScore(w,toks,key){if(key.includes(w))return 0;const max=w.length>=7?2:w.length>=4?1:0;if(!max)return 9;let best=9;for(const t of toks){const pre=t.slice(0,Math.max(w.length,1)+0);const d=Math.min(lev1(w,t,max),lev1(w,pre,max));if(d<best)best=d;if(!best)break;}return best<=max?best:9;}
+function wordScore(w,toks,key){let best=9;const max=w.length>=7?2:w.length>=4?1:0;
+  for(const t of toks){if(t===w)return 0;if(t.startsWith(w)){best=Math.min(best,w.length>=3?0.2:0.6);continue;}if(max&&best>0.2){const d=Math.min(lev1(w,t,max),t.length>w.length?lev1(w,t.slice(0,w.length),max):9);if(d<=max)best=Math.min(best,d);}}
+  if(best>0.6&&w.length>=4&&key.includes(w))best=0.6;return best<=Math.max(max,0.6)?best:9;}
 function searchTerr(q){const Q=normS(q);if(Q.length<2)return [];const words=Q.split(" ").filter(w=>!STOP.has(w));if(!words.length)return [];
   const own=TERRS.map(t=>({k:"own",t,n:t.nome,s:`Território guardado neste celular · ${t.tipo||""}${t.mun&&t.mun.length?" · "+t.mun.join(", "):""}`,key:normS(t.nome+" "+(t.tipo||"")+" "+(t.mun||[]).join(" ")+" "+(t.cod||""))}));
   const all=[...own,...(SIDXN||[])];const res=[];
-  for(const x of all){if(!x.toks)x.toks=[...new Set(x.key.split(" "))];let sc=0,ok=true;for(const w of words){const d=wordScore(w,x.toks,x.key);if(d>2){ok=false;break;}sc+=d;}if(!ok)continue;
+  for(const x of [...all,...LIVEPCT]){if(!x.toks)x.toks=[...new Set(x.key.split(" "))];if(!x.ntoks)x.ntoks=normS(x.n).split(" ");let sc=0,ok=true;for(const w of words){const d=wordScore(w,x.toks,x.key);if(d>2){ok=false;break;}sc+=d;if(wordScore(w,x.ntoks,normS(x.n))<=1)sc-=0.8;}if(!ok)continue;
     const nk=normS(x.n);sc+=(nk.startsWith(Q)?0:nk.includes(Q)?0.5:1.5)+(x.k==="own"?-1:0)+(x.k==="as"?0.3:0);res.push([sc,x]);}
   return res.sort((a,b)=>a[0]-b[0]||a[1].n.localeCompare(b[1].n,"pt")).slice(0,30).map(r=>r[1]);}
+/* com internet: CEFIR coletivos (PCT) do município citado na busca, direto do SICAR */
+let LIVEPCT=[];const livePctDone=new Set();
+async function livePctFor(q,cb){if(!navigator.onLine||!MUN.length)return;const Q=" "+normS(q)+" ";const ms=[...new Set(MUN.map(m=>m.name))].filter(n=>Q.includes(" "+normS(n)+" "));
+  for(const mn of ms){if(livePctDone.has(mn))continue;livePctDone.add(mn);
+    try{const f=`tipo_imovel='PCT' AND municipio='${mn.replace(/'/g,"''")}'`;const j=await fetch(CAR_WFS+"&count=500&CQL_FILTER="+encodeURIComponent(f)).then(r=>r.json());
+      for(const ft of j.features||[]){const p=ft.properties||{};if(p.status_imovel==="CA"||CARC.some(c=>c.cod===p.cod_imovel))continue;const rings=[];const g=ft.geometry;if(g&&g.type==="MultiPolygon")g.coordinates.forEach(pl=>pl.forEach(rg=>rings.push(rg)));else if(g&&g.type==="Polygon")g.coordinates.forEach(rg=>rings.push(rg));if(!rings.length)continue;
+        const o={tipo:"PCT",cod:p.cod_imovel,st:p.status_imovel,cond:p.condicao,mun:p.municipio,area:+p.area||0,mf:+p.m_fiscal||0,criado:(p.dat_criacao||"").slice(0,10),r:rings,bb:bboxR(rings),liga:""};
+        const x={k:"pct",o,n:`Fundo/Fecho de Pasto ou comunidade tradicional · ${o.mun}`,s:`CEFIR coletivo (PCT) no SICAR agora · ${o.mun} · ${fmtN(o.area,1)} ha · ${o.cod.slice(0,10)}…${o.cod.slice(-6)}`};x.key=normS(x.n+" "+o.mun+" "+o.cod+" fundo de pasto fecho de pasto pct cefir coletivo comunidade tradicional "+x.s);LIVEPCT.push(x);}
+      cb();}catch(e){livePctDone.delete(mn);}}}
 const SCOL={ti:"#a0522d",qu:"#7b3fa0",as:"#c27c0e",uc:"#2e7d32",pct:"#00897b",own:"#d81b60"};
 function initSearch(){const inp=$("tbusca"),ul=$("tbres");if(!inp)return;let cur=[];
   const show=()=>{if(!B){ul.hidden=false;ul.innerHTML=`<li class="none">Carregando os dados…</li>`;return;}if(!SIDXN)buildSearch();cur=searchTerr(inp.value);
     if(normS(inp.value).length<2){ul.hidden=true;return;}ul.hidden=false;
     ul.innerHTML=cur.length?cur.map((x,i)=>`<li><button type="button" data-i="${i}"><span class="ic" style="--c:${SCOL[x.k]}">${ICON(x.k==="own"?"ter":x.k)}</span><span><b>${esc(x.n)}</b><small>${esc(x.s)}</small></span></button></li>`).join("")
       :`<li class="none">Nada encontrado. Tente outra parte do nome ou o município. As bases públicas não trazem o nome dos Fundos e Fechos de Pasto: busque "fundo de pasto" e o município, ou insira o território com o nome da comunidade (ele passa a aparecer na busca).</li>`;
-    ul.querySelectorAll("button").forEach(b=>b.onclick=()=>pick(cur[+b.dataset.i]));};
+    ul.querySelectorAll("button").forEach(b=>b.onclick=()=>pick(cur[+b.dataset.i]));
+    clearTimeout(show.t);show.t=setTimeout(()=>livePctFor(inp.value,()=>{if(document.activeElement===inp||!ul.hidden)show();}),600);};
   const pick=x=>{ul.hidden=true;inp.value=x.n;say("");
     if(x.k==="own"){const t=x.t;openSaved(t);return;}
     if(x.k==="pct"){useCarPct(x.o);return;}
