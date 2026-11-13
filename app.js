@@ -1302,8 +1302,9 @@ function mbxPtTxt(S){if(!S.pt)return "";const M=MBX[S.t];
 function mbxText(S,area){const M=MBX[S.t],st=mbxStats(S);if(!st.tot)return S.t==="fogo"?`Nenhuma queimada foi mapeada na ${area} de ${st.y0} a ${st.y1}.`:`Nenhum desmatamento foi mapeado na ${area} de ${st.y0} a ${st.y1}.`;
   if(S.t==="fogo")return `De ${st.y0} a ${st.y1}, ${haTxt(S.onceHa)} (${pcTxt(S.onceHa,S.totHa)} da ${area}) queimaram pelo menos uma vez, e ${haTxt(S.recHa)} queimaram 3 vezes ou mais. Houve fogo em ${st.comAno} dos ${S.years.length} anos; o pior ano foi ${st.max.yr} (${haTxt(st.max.ha)}). Nos últimos 5 anos (${st.l5[0].yr}–${st.y1}) queimaram ${haTxt(st.s5)}; em ${st.y1}, ${haTxt(st.last.ha)}.`;
   return `De ${st.y0} a ${st.y1}, ${haTxt(S.onceHa)} (${pcTxt(S.onceHa,S.totHa)} da ${area}) foram desmatados pelo menos uma vez. Somando os anos, foram ${haTxt(st.byCls[4]||0)} de vegetação primária e ${haTxt(st.byCls[6]||0)} de vegetação secundária (que tinha voltado a crescer e foi derrubada de novo). O ano com mais desmatamento foi ${st.max.yr} (${haTxt(st.max.ha)}). Nos últimos 5 anos (${st.l5[0].yr}–${st.y1}) foram ${haTxt(st.s5)}; em ${st.y1}, ${haTxt(st.last.ha)}.`;}
+function niceMax(mx){const p=10**Math.floor(Math.log10(mx)),f=mx/p;return ([1,1.5,2,3,4,5,6,8,10].find(v=>v>=f-1e-9)||10)*p;}
 function barSVG(S){const W0=400,H0=190,ml=44,mr=8,mt=10,mb=24,pw=W0-ml-mr,ph=H0-mt-mb,n=S.rows.length,M=MBX[S.t],ks=Object.keys(M.cls);
-  const mx=Math.max(1,...S.rows.map(r=>r.ha)),nice=(()=>{const p=10**Math.floor(Math.log10(mx)),f=mx/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p;})();
+  const mx=Math.max(1,...S.rows.map(r=>r.ha)),nice=niceMax(mx);
   const bw=pw/n,Y=v=>mt+(1-v/nice)*ph;let s=`<svg viewBox="0 0 ${W0} ${H0}" role="img" aria-label="Gráfico de barras: ${M.n.toLowerCase()} por ano, em hectares">`;
   for(const f of [0,.5,1]){const v=nice*f;s+=`<line x1="${ml}" x2="${ml+pw}" y1="${Y(v)}" y2="${Y(v)}" class="cg"/><text x="${ml-5}" y="${Y(v)+4}" text-anchor="end" class="ct">${fmtN(v)}</text>`;}
   S.rows.forEach((r,i)=>{let y0=Y(0);ks.forEach(k=>{const v=r.cls[k]||0;if(!v)return;const h=v/nice*ph;s+=`<rect x="${(ml+i*bw+bw*.12).toFixed(1)}" y="${(y0-h).toFixed(1)}" width="${(bw*.76).toFixed(1)}" height="${Math.max(.8,h).toFixed(1)}" rx="1.5" fill="#${M.cls[k][1]}"><title>${r.yr}: ${haTxt(v)} (${M.cls[k][0].toLowerCase()})</title></rect>`;y0-=h;});
@@ -1328,7 +1329,7 @@ function mbxStart(o,test,bb,pt,cheap,area){o.mbx={};const out=$("out");out.__mbx
     .then(S=>{o.mbx[t]=S;if(out.__mbx===o){const el=$("mbx_"+t);if(el)el.innerHTML=mbxHTML(S,area,t);}return S;});
   return navigator.onLine?Promise.all([run("fogo"),run("desm")]):Promise.resolve([null,null]);}
 function barPNG(S){const M=MBX[S.t],ks=Object.keys(M.cls),c=document.createElement("canvas"),W0=1400,H0=460,ml=110,mr=20,mt=30,mb=50,pw=W0-ml-mr,ph=H0-mt-mb,n=S.rows.length;c.width=W0;c.height=H0;const g=c.getContext("2d");
-  g.fillStyle="#fff";g.fillRect(0,0,W0,H0);const mx=Math.max(1,...S.rows.map(r=>r.ha)),p=10**Math.floor(Math.log10(mx)),f=mx/p,nice=(f<=1?1:f<=2?2:f<=5?5:10)*p,Y=v=>mt+(1-v/nice)*ph,bw=pw/n;
+  g.fillStyle="#fff";g.fillRect(0,0,W0,H0);const mx=Math.max(1,...S.rows.map(r=>r.ha)),nice=niceMax(mx),Y=v=>mt+(1-v/nice)*ph,bw=pw/n;
   g.font="22px Helvetica, Arial";g.strokeStyle="#e2e5dd";g.lineWidth=2;g.fillStyle="#5a635d";g.textAlign="right";for(const fr of [0,.5,1]){const v=nice*fr;g.beginPath();g.moveTo(ml,Y(v));g.lineTo(ml+pw,Y(v));g.stroke();g.fillText(fmtN(v)+" ha",ml-10,Y(v)+7);}
   S.rows.forEach((r,i)=>{let y0=Y(0);ks.forEach(k=>{const v=r.cls[k]||0;if(!v)return;const h=Math.max(2,v/nice*ph);g.fillStyle="#"+M.cls[k][1];g.fillRect(ml+i*bw+bw*.12,y0-h,bw*.76,h);y0-=h;});
     if(r.yr%5===0){g.fillStyle="#5a635d";g.textAlign="center";g.fillText(r.yr,ml+i*bw+bw/2,H0-14);}});return c.toDataURL("image/jpeg",0.9);}
@@ -1395,5 +1396,5 @@ function bootSamples(){const smp=$("samples");if(!smp)return;SAMPLES.forEach(([n
 window.addEventListener("resize",()=>resize());
 resize();bootSamples();initBases();initMbYear();initSearch();
 loadBase().then(()=>{$("hint").textContent="Toque no mapa ou use sua localização";draw();buildSearch();if($("tbusca")&&$("tbusca").value)$("tbusca").dispatchEvent(new Event("input"));initDB();window.__ready=true;}).catch(e=>{$("hint").textContent="Não foi possível carregar os dados. Verifique a internet e recarregue a página.";console.error(e);});
-window.__t={analyze,analyzeTerritory,parseLoc,exifGPS,readFiles,ensure,rasterAt,summary,render,renderTerritory,carSection,get B(){return B},get CARC(){return CARC},get MUN(){return MUN},inPoly,utmToLL};
+window.__t={pdfDoc,mbxPDF,mbxData,pctAt,searchTerr,get lastMbx(){return $("out").__mbx;},analyze,analyzeTerritory,parseLoc,exifGPS,readFiles,ensure,rasterAt,summary,render,renderTerritory,carSection,get B(){return B},get CARC(){return CARC},get MUN(){return MUN},inPoly,utmToLL};
 })();
