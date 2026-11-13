@@ -1235,7 +1235,7 @@ function ICON(id){const P={
   lu:'<path d="M5 19c0-8 6-14 14-14 0 8-6 14-14 14z"/><path d="M5 19l7-7"/>',
   car:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/>',
   min:'<path d="M4 8c4-4 12-4 16 0"/><path d="M12 6v15"/><path d="M9 21h6"/>',
-  en:'<path d="M12 12v9M9 21h6"/><path d="M12 12V3M12 12l7.5 4.5M12 12l-7.5 4.5"/><circle cx="12" cy="12" r="1.6"/>',
+  en:'<path d="M12 9v12M9 21h6"/><path d="M12 9V2.5M12 9l5.6 3.2M12 9l-5.6 3.2"/><circle cx="12" cy="9" r="1.4"/>',
   lt:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
   fogo:'<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-5 8-1-1-2-2-2-4-1 2-2 4-2 8 0 4 3 7 7 7z"/><path d="M12 22c-1.7 0-3-1.3-3-3 0-2 3-4 3-4s3 2 3 4c0 1.7-1.3 3-3 3z"/>',
   desm:'<path d="M12 3l6 9h-4l4 6H6l4-6H6z"/><path d="M12 18v3"/><path d="M3 21L21 3"/>',
@@ -1263,7 +1263,7 @@ const MBX={
     src:"MapBiomas Coleção 11, Perda de Vegetação Nativa (desmatamento anual, 30 m)"}};
 const MBXU=new Map();
 function limiter(n){let a=0;const q=[];const next=()=>{if(a>=n||!q.length)return;a++;const [f,res,rej]=q.shift();Promise.resolve().then(f).then(res,rej).finally(()=>{a--;next();});};return f=>new Promise((res,rej)=>{q.push([f,res,rej]);next();});}
-const mbxLim=limiter(6);
+const mbxLim=limiter(12);
 function mbxUrl(t,y){const k=t+y,c=MBXU.get(k);if(c&&Date.now()-c.t<3*3600e3)return c.url?Promise.resolve(c.url):c.p;const M=MBX[t];
   const q=new URLSearchParams([["subthemeKey",M.sk],["legendKey",M.lk],["year",String(y)],...M.pv.map(v=>["pixelValue",String(v)])]);
   const p=fetch(MB_API+"/brazil/maps/map?"+q,MB_H).then(r=>r.json()).then(m=>{if(!m.url)throw new Error("sem mapa");MBXU.set(k,{url:m.url,t:Date.now()});draw();return m.url;});
@@ -1277,7 +1277,7 @@ function mbxTile(t,url){if(MBXTD.has(url))return MBXTD.get(url);const pal=MBXPAL
   MBXTD.set(url,p);if(MBXTD.size>900){for(const k of MBXTD.keys()){MBXTD.delete(k);if(MBXTD.size<=700)break;}}return p;}
 /* lê os mapas anuais da área (círculo ou polígono) e soma a área por ano; guarda também quantas vezes cada pixel foi atingido */
 async function mbxSeries(t,test,bb,pt,cheap,onProg){if(!navigator.onLine)return null;const M=MBX[t];
-  let z=13;while(z>8&&baseTilesFor(bb,z).length>9)z--;const tl=baseTilesFor(bb,z),n=2**z,blk=cheap?1:4;
+  let z=12;while(z>8&&baseTilesFor(bb,z).length>6)z--;const tl=baseTilesFor(bb,z),n=2**z,blk=cheap?1:4;
   const masks=tl.map(([x,y])=>{const m=new Uint8Array(65536);let k=0;for(let j0=0;j0<256;j0+=blk){const lat=m2lat(y+(j0+blk/2)/256,z);if(lat<bb.s||lat>bb.n)continue;
       for(let i0=0;i0<256;i0+=blk){const lon=(x*256+i0+blk/2)/(n*256)*360-180;if(lon<bb.w||lon>bb.e)continue;if(!test(lon,lat))continue;for(let j=j0;j<j0+blk;j++)for(let i=i0;i<i0+blk;i++){m[j*256+i]=1;k++;}}}return {m,k};});
   const totPx=masks.reduce((s,o)=>s+o.k,0);if(!totPx)return null;
@@ -1301,7 +1301,7 @@ function mbxPtTxt(S){if(!S.pt)return "";const M=MBX[S.t];
   return S.t==="fogo"?`O ponto escolhido queimou ${ys.length===1?"uma vez":ys.length+" vezes"}: em ${lista}.`:`O ponto escolhido foi desmatado em ${lista}${S.pt.some(p=>p.v===6)?" (vegetação que já tinha se regenerado)":""}.`;}
 function mbxText(S,area){const M=MBX[S.t],st=mbxStats(S);if(!st.tot)return S.t==="fogo"?`Nenhuma queimada foi mapeada na ${area} de ${st.y0} a ${st.y1}.`:`Nenhum desmatamento foi mapeado na ${area} de ${st.y0} a ${st.y1}.`;
   if(S.t==="fogo")return `De ${st.y0} a ${st.y1}, ${haTxt(S.onceHa)} (${pcTxt(S.onceHa,S.totHa)} da ${area}) queimaram pelo menos uma vez, e ${haTxt(S.recHa)} queimaram 3 vezes ou mais. Houve fogo em ${st.comAno} dos ${S.years.length} anos; o pior ano foi ${st.max.yr} (${haTxt(st.max.ha)}). Nos últimos 5 anos (${st.l5[0].yr}–${st.y1}) queimaram ${haTxt(st.s5)}; em ${st.y1}, ${haTxt(st.last.ha)}.`;
-  return `De ${st.y0} a ${st.y1}, foram desmatados ${haTxt(st.tot)} (${pcTxt(st.tot,S.totHa)} da ${area}): ${haTxt(st.byCls[4]||0)} de vegetação primária e ${haTxt(st.byCls[6]||0)} de vegetação secundária. O ano com mais desmatamento foi ${st.max.yr} (${haTxt(st.max.ha)}). Nos últimos 5 anos (${st.l5[0].yr}–${st.y1}) foram ${haTxt(st.s5)}; em ${st.y1}, ${haTxt(st.last.ha)}.`;}
+  return `De ${st.y0} a ${st.y1}, ${haTxt(S.onceHa)} (${pcTxt(S.onceHa,S.totHa)} da ${area}) foram desmatados pelo menos uma vez. Somando os anos, foram ${haTxt(st.byCls[4]||0)} de vegetação primária e ${haTxt(st.byCls[6]||0)} de vegetação secundária (que tinha voltado a crescer e foi derrubada de novo). O ano com mais desmatamento foi ${st.max.yr} (${haTxt(st.max.ha)}). Nos últimos 5 anos (${st.l5[0].yr}–${st.y1}) foram ${haTxt(st.s5)}; em ${st.y1}, ${haTxt(st.last.ha)}.`;}
 function barSVG(S){const W0=400,H0=190,ml=44,mr=8,mt=10,mb=24,pw=W0-ml-mr,ph=H0-mt-mb,n=S.rows.length,M=MBX[S.t],ks=Object.keys(M.cls);
   const mx=Math.max(1,...S.rows.map(r=>r.ha)),nice=(()=>{const p=10**Math.floor(Math.log10(mx)),f=mx/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p;})();
   const bw=pw/n,Y=v=>mt+(1-v/nice)*ph;let s=`<svg viewBox="0 0 ${W0} ${H0}" role="img" aria-label="Gráfico de barras: ${M.n.toLowerCase()} por ano, em hectares">`;
@@ -1316,7 +1316,7 @@ function mbxHTML(S,area,t){const M=MBX[t];
   const st=mbxStats(S);let h=head;const pt=mbxPtTxt(S);if(pt)h+=`<p style="margin:0"><strong>${esc(pt)}</strong></p>`;
   h+=`<p style="margin:0">${esc(mbxText(S,area))}</p>`;
   h+=t==="fogo"?`<div class="fstat"><div><b>${haTxt(S.onceHa)}</b><span>queimaram pelo menos 1 vez (${pcTxt(S.onceHa,S.totHa)})</span></div><div><b>${haTxt(S.recHa)}</b><span>queimaram 3 vezes ou mais</span></div><div><b>${haTxt(st.s5)}</b><span>queimados de ${st.l5[0].yr} a ${st.y1}</span></div></div>`
-    :`<div class="fstat"><div><b>${haTxt(st.tot)}</b><span>desmatados de ${st.y0} a ${st.y1} (${pcTxt(st.tot,S.totHa)})</span></div><div><b>${haTxt(st.s5)}</b><span>desmatados de ${st.l5[0].yr} a ${st.y1}</span></div><div><b>${st.max.yr||"–"}</b><span>ano com mais desmatamento</span></div></div>`;
+    :`<div class="fstat"><div><b>${haTxt(S.onceHa)}</b><span>desmatados de ${st.y0} a ${st.y1} (${pcTxt(S.onceHa,S.totHa)})</span></div><div><b>${haTxt(st.s5)}</b><span>desmatados de ${st.l5[0].yr} a ${st.y1}</span></div><div><b>${st.max.yr||"–"}</b><span>ano com mais desmatamento</span></div></div>`;
   if(st.tot)h+=`<figure class="chart bchart"><figcaption>${t==="fogo"?"Área queimada":"Área desmatada"} por ano (hectares)</figcaption>${Object.keys(M.cls).length>1?`<div class="ckeys">${Object.values(M.cls).map(c=>`<span><i style="background:#${c[1]};height:10px"></i>${esc(c[0])}</span>`).join("")}</div>`:""}${barSVG(S)}</figure>
     <details><summary>Ver tabela por ano</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Ano</th><th>Área (ha)</th><th>% da ${area}</th>${Object.keys(M.cls).length>1?Object.values(M.cls).map(c=>`<th>${esc(c[0].split(" (")[0])} (ha)</th>`).join(""):""}</tr></thead><tbody>${S.rows.slice().reverse().map(r=>`<tr><td>${r.yr}</td><td>${r.ok?fmtN(r.ha,1):"sem leitura"}</td><td>${r.ok?pcTxt(r.ha,S.totHa):"–"}</td>${Object.keys(M.cls).length>1?Object.keys(M.cls).map(k=>`<td>${fmtN(r.cls[k]||0,1)}</td>`).join(""):""}</tr>`).join("")}</tbody></table></div></details>`;
   h+=`<p class="empty" style="font-size:13px">${esc(M.src)}, lido agora na Plataforma MapBiomas em pixels de cerca de ${S.pxm} m. Área analisada: ${haTxt(S.totHa)}.${S.fail?` ${S.fail} ano(s) não puderam ser lidos (marcados com ?).`:""}${t==="desm"?" Na Caatinga, parte da perda mapeada pode ser roçado de agricultura tradicional; confira com a comunidade.":" O fogo pode ser queimada de manejo, incêndio ou queima para desmatar; confira com a comunidade."}</p>`;
@@ -1339,7 +1339,7 @@ function mbxPDF(T,IMG2,TABLE,o,area){const F=o.mbx&&o.mbx.fogo,D=o.mbx&&o.mbx.de
   const ys=[];for(let y=1985;y<=2025;y++)ys.push(y);const g=(S,y)=>{if(!S)return "–";const r=S.rows.find(r=>r.yr===y);return r?(r.ok?fmtN(r.ha,1):"?"):"–";};
   TABLE(["Ano","Área queimada (ha)","Desmatamento (ha)","Ano","Área queimada (ha)","Desmatamento (ha)"],ys.slice(0,21).map((y,i)=>{const y2=ys[i+21];return [String(y),g(F,y),g(D,y),y2?String(y2):"",y2?g(F,y2):"",y2?g(D,y2):""];}),{fontSize:7.5});
   T("O fogo pode ser queimada de manejo, incêndio ou queima para desmatar. Na Caatinga, parte do desmatamento mapeado pode ser roçado de agricultura tradicional. Confirme com a comunidade.",8.5,"italic",[70,78,72]);}
-function mbxData(o){const f=t=>{const S=o.mbx&&o.mbx[t];if(!S)return null;const st=mbxStats(S);return {anos:`${st.y0}-${st.y1}`,areaAnalisadaHa:Math.round(S.totHa),totalHa:Math.round(t==="fogo"?S.onceHa:st.tot),ultimos5anosHa:Math.round(st.s5),piorAno:st.max.yr||null,noPonto:S.pt?S.pt.map(p=>p.yr):null,porAno:S.rows.filter(r=>r.ok&&r.ha>0.05).map(r=>`${r.yr}: ${Math.round(r.ha)} ha`)};};
+function mbxData(o){const f=t=>{const S=o.mbx&&o.mbx[t];if(!S)return null;const st=mbxStats(S);return {anos:`${st.y0}-${st.y1}`,areaAnalisadaHa:Math.round(S.totHa),totalHa:Math.round(S.onceHa),ultimos5anosHa:Math.round(st.s5),piorAno:st.max.yr||null,noPonto:S.pt?S.pt.map(p=>p.yr):null,porAno:S.rows.filter(r=>r.ok&&r.ha>0.05).map(r=>`${r.yr}: ${Math.round(r.ha)} ha`)};};
   return {queimadas:f("fogo"),desmatamento:f("desm")};}
 
 /* ---------- CEFIR coletivo (PCT) no ponto ---------- */
