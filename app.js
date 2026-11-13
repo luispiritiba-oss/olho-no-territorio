@@ -202,10 +202,10 @@ function requestCarWms(){const v={w:view.w,e:view.e,s:view.s,n:view.n};const key
     im.onerror=()=>{if(id===carWmsId){ml.hidden=true;}};im.src=url;},350);}
 let drawQ=false; function draw(){ if(drawQ)return; drawQ=true; requestAnimationFrame(()=>{drawQ=false; drawNow(ctx,{});}); }
 /* ---------- fundos de mapa ---------- */
-const BASES={padrao:{n:"Simples"},sat:{n:"Satélite",url:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",max:18,attr:"Imagem de satélite: Esri, Vantor, Earthstar Geographics"},
+const BASES={branco:{n:"Branco",bg:"#ffffff"},sat:{n:"Satélite",url:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",max:18,attr:"Imagem de satélite: Esri, Vantor, Earthstar Geographics"},
   terreno:{n:"Terreno",url:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",max:18,attr:"Mapa de terreno: Esri, HERE, Garmin, USGS, IBGE"},
-  branco:{n:"Fundo branco",bg:"#ffffff"}};
-let BASE=(()=>{try{const b=localStorage.getItem("ot_base");return BASES[b]?b:"padrao";}catch(e){return "padrao";}})();
+};
+let BASE=(()=>{try{const b=localStorage.getItem("ot_base");return BASES[b]?b:"branco";}catch(e){return "branco";}})();
 const BT=new Map();
 function baseTile(url){let t=BT.get(url);if(t)return t;t={ok:false};t.p=new Promise(res=>{const im=new Image();im.crossOrigin="anonymous";im.onload=()=>{t.ok=true;t.img=im;res(t);draw();};im.onerror=()=>{t.err=true;res(t);};im.src=url;});
   BT.set(url,t);if(BT.size>700){for(const k of BT.keys()){BT.delete(k);if(BT.size<=600)break;}}return t;}
@@ -227,7 +227,7 @@ function setBase(b){BASE=b;try{localStorage.setItem("ot_base",b);}catch(e){}
   if(b==="sat"||b==="terreno"){const l=LAYERS.find(l=>l.id==="lu");if(l&&l.on)setLayer("lu",false);}
   document.querySelectorAll("#bases button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.b===b)));
   const a=$("mapattr");if(a){a.textContent=BASES[b].attr||"";a.hidden=!BASES[b].attr;}draw();}
-function initBases(){const box=$("bases");if(!box)return;box.innerHTML=Object.entries(BASES).map(([k,v])=>`<button type="button" data-b="${k}" aria-pressed="${k===BASE}" title="${v.n}">${ICON("b_"+k)}<span>${v.n==="Fundo branco"?"Branco":v.n}</span></button>`).join("");
+function initBases(){const box=$("bases");if(!box)return;box.innerHTML=Object.entries(BASES).map(([k,v])=>`<button type="button" data-b="${k}" aria-pressed="${k===BASE}" title="${v.n}">${ICON("b_"+k)}<span>${v.n}</span></button>`).join("");
   box.querySelectorAll("button").forEach(b=>b.onclick=()=>setBase(b.dataset.b));setBase(BASE);}
 /* imagem do CAR (WMS do SICAR) recolorida */
 function carWmsImage(v,w,h){return new Promise((res,rej)=>{const url=CAR_WMS+`?service=WMS&version=1.1.1&request=GetMap&layers=sicar:sicar_imoveis_ba&styles=&srs=EPSG:4326&bbox=${v.w},${v.s},${v.e},${v.n}&width=${w}&height=${h}&format=image/png&transparent=true`;
@@ -250,7 +250,8 @@ function drawNow(c,opts){
     if(!detail&&overviewImg) c.drawImage(overviewImg,px(-47),py(-8),px(-37)-px(-47),py(-19)-py(-8));
     else for(const t of visTiles()) if(t.luImg) c.drawImage(t.luImg,px(t.tx),py(t.ty+1),px(t.tx+1)-px(t.tx),py(t.ty)-py(t.ty+1));
     c.restore();}
-  for(const t of ["desm","fogo"]){if(!on(t)||!navigator.onLine)continue;const M=MBX[t];if(MBYEAR<M.y0)continue;const yr=Math.min(M.y1,MBYEAR);const u=mbxUrlNow(t,yr);
+  for(const t of ["desm","fogo"]){if(!on(t))continue;const M=MBX[t];if(MBYEAR<M.y0)continue;const yr=Math.min(M.y1,MBYEAR);
+    if(!navigator.onLine){c.save();c.imageSmoothingEnabled=false;drawQGrid(c,t,yr);c.restore();continue;}const u=mbxUrlNow(t,yr);
     if(!u){if(!opts.noLoad)mbxUrl(t,yr).catch(()=>{});continue;}c.save();c.globalAlpha=.95;c.imageSmoothingEnabled=false;drawXYZ(c,u,zoomFor(view,W,opts.scale||DPR,14),opts,t==="fogo"?FIRE_RGB:null);c.restore();}
   if(on("car")&&(detail||opts.forceCar)){const live=opts.forceCar||(vw()<=CARWMS_MAX&&navigator.onLine);if(live&&!opts.noLoad)requestCarWms();
     if(live&&carWms&&bbOv(carWms.v,view)){c.drawImage(carWms.img,px(carWms.v.w),py(carWms.v.n),px(carWms.v.e)-px(carWms.v.w),py(carWms.v.s)-py(carWms.v.n));}
@@ -610,7 +611,7 @@ async function snapshotA(bb,selPt){const S=900;const cx=(bb.w+bb.e)/2,cy=(bb.s+b
   if(!selPt)sel=null;let ok=true;
   try{drawNow(c,{scale:1,bg:"#eef0e8",ink:"#1b211e",noLoad:true,noSel:!selPt,forceCar:!!wms});}catch(e){ok=false;}
   view=keep.view;W=keep.W;H=keep.H;sel=keep.sel;carWms=keep.carWms;
-  let data;try{data=off.toDataURL("image/jpeg",0.85);}catch(e){/* imagem de fundo sem permissão: refaz sem fundo */const b0=BASE;BASE="padrao";const r=snapshot(bb,selPt);BASE=b0;return {img:r,leg:legendItems(sv,selPt,false)};}
+  let data;try{data=off.toDataURL("image/jpeg",0.85);}catch(e){/* imagem de fundo sem permissão: refaz sem fundo */const b0=BASE;BASE="branco";const r=snapshot(bb,selPt);BASE=b0;return {img:r,leg:legendItems(sv,selPt,false)};}
   return {img:data,leg:legendItems(sv,selPt,!!wms),sv};}
 function legendItems(bb,selPt,carLive){const it=[];const any=(arr)=>arr.some(o=>o.bb&&bbOv(o.bb,bb));
   if(selPt&&sel)it.push({k:"circ",c:"#16805f",n:`Ponto consultado e raio de ${sel.R} km`});
@@ -876,7 +877,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),indice:idxData(r.idx),...mbxData(r),conflitoRelatado:!!t.conflito,carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.7.0";
+const VER="1.8.0";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -976,10 +977,11 @@ function renderCfg(){const c=$("cfg");c.innerHTML=`<label>Endereço do script (t
 /* mapa offline */
 async function cacheAll(){const b=$("offbtn"),m=$("offmsg");if(!("caches" in window)){m.textContent="Este navegador não guarda o mapa para uso sem internet.";return;}
   const urls=[DATA_URL+"base.json",DATA_URL+"lu/overview.png"];B.tiles.forEach(([k,nm,nb,lu])=>{urls.push(DATA_URL+"t/"+k+".json");if(lu)urls.push(DATA_URL+"lu/"+k+".png",DATA_URL+"car/"+k+".png",DATA_URL+"s/"+k+".gz");});urls.push(DATA_URL+"s/index.json");
+  try{const I=await fetch(DATA_URL+"q/index.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null);if(I){urls.push(DATA_URL+"q/index.json");I.tiles.forEach(k=>urls.push(DATA_URL+"q/"+k+".gz"));}}catch(e){}
   b.disabled=true;let done=0,fail=0;const c=await caches.open("ot-dados-v5");
   const work=async()=>{while(urls.length){const u=urls.shift();try{if(!(await c.match(u))){const r=await fetch(u,{cache:"no-cache"});if(r.ok)await c.put(u,r);else fail++;}}catch(e){fail++;}done++;m.textContent=`Baixando o mapa: ${Math.round(done/(done+urls.length)*100)}%`;}};
   await Promise.all([work(),work(),work(),work()]);b.disabled=false;
-  m.textContent=fail?`Faltaram ${fail} arquivos. Tente de novo com internet melhor.`:"Mapa da Bahia guardado no celular. As consultas funcionam sem internet.";if(!fail)lsSet("ot_offline",new Date().toISOString());}
+  m.textContent=fail?`Faltaram ${fail} arquivos. Tente de novo com internet melhor.`:"Mapa da Bahia guardado no celular, com a série do MapBiomas, as queimadas e o desmatamento. As consultas funcionam sem internet.";if(!fail)lsSet("ot_offline",new Date().toISOString());}
 
 /* territórios */
 async function saveTerritory(t,r){
@@ -1240,7 +1242,7 @@ function initMbYear(){const sel=$("mbyear");if(!sel)return;sel.innerHTML=Array.f
 function ICON(id){const P={
   lu:'<path d="M5 19c0-8 6-14 14-14 0 8-6 14-14 14z"/><path d="M5 19l7-7"/>',
   car:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/>',
-  min:'<path d="M4 8c4-4 12-4 16 0"/><path d="M12 6v15"/><path d="M9 21h6"/>',
+  min:'<path d="M3.5 20.5L14.5 9.5"/><path d="M9 4.5Q19.5 4.5 19.5 15"/><path d="M14 21l1.6-2.8h3.2L20.4 21z"/>',
   en:'<path d="M12 9v12M9 21h6"/><path d="M12 9V2.5M12 9l5.6 3.2M12 9l-5.6 3.2"/><circle cx="12" cy="9" r="1.4"/>',
   lt:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
   fogo:'<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-5 8-1-1-2-2-2-4-1 2-2 4-2 8 0 4 3 7 7 7z"/><path d="M12 22c-1.7 0-3-1.3-3-3 0-2 3-4 3-4s3 2 3 4c0 1.7-1.3 3-3 3z"/>',
@@ -1254,7 +1256,6 @@ function ICON(id){const P={
   as:'<path d="M12 21v-8"/><path d="M12 13c0-4-3-6-7-6 0 4 3 6 7 6zM12 11c0-4 3-6 7-6 0 4-3 6-7 6z"/>',
   sa:'<path d="M3 10l9-6 9 6z"/><path d="M4 21h16M6 21V10M18 21V10M10 21V10M14 21V10"/>',
   mu:'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z" stroke-dasharray="3 2.5"/>',
-  b_padrao:'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v16M15 6v16"/>',
   b_sat:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
   b_terreno:'<path d="M3 20l6-10 4 6 3-4 5 8z"/>',
   b_branco:'<rect x="4" y="4" width="16" height="16" rx="2"/>',
@@ -1302,6 +1303,9 @@ const pcTxt=(v,tot)=>{const p=tot?v/tot*100:0;return p<=0?"0%":p<0.1?"<0,1%":p<1
 function mbxStats(S){const ok=S.rows.filter(r=>r.ok),max=ok.reduce((a,r)=>r.ha>a.ha?r:a,{ha:-1}),last=S.rows[S.rows.length-1],l5=S.rows.slice(-5),s5=l5.reduce((a,r)=>a+r.ha,0),tot=ok.reduce((a,r)=>a+r.ha,0),comAno=ok.filter(r=>r.ha>0.05).length;
   const byCls={};ok.forEach(r=>Object.entries(r.cls).forEach(([k,v])=>byCls[k]=(byCls[k]||0)+v));return {max,last,l5,s5,tot,comAno,byCls,y0:S.years[0],y1:S.years[S.years.length-1]};}
 function mbxPtTxt(S){if(!S.pt)return "";const M=MBX[S.t];
+  if(S.grid){if(!S.pt.length)return S.t==="fogo"?`Na área de cerca de ${S.pxm} m em volta do ponto, nenhuma queimada foi mapeada de ${M.y0} a ${M.y1}.`:`Na área de cerca de ${S.pxm} m em volta do ponto, nenhum desmatamento foi mapeado de ${M.y0} a ${M.y1}.`;
+    const ys=S.pt.map(p=>p.yr),lista=ys.length>1?ys.slice(0,-1).join(", ")+" e "+ys[ys.length-1]:String(ys[0]);
+    return S.t==="fogo"?`Na área de cerca de ${S.pxm} m em volta do ponto houve queimada em ${ys.length===1?"1 ano":ys.length+" anos"}: ${lista}.`:`Na área de cerca de ${S.pxm} m em volta do ponto houve desmatamento em ${lista}.`;}
   if(!S.pt.length)return S.t==="fogo"?`No ponto escolhido, nenhuma queimada foi mapeada de ${M.y0} a ${M.y1}.`:`No ponto escolhido, nenhum desmatamento foi mapeado de ${M.y0} a ${M.y1}.`;
   const ys=S.pt.map(p=>p.yr),lista=ys.length>1?ys.slice(0,-1).join(", ")+" e "+ys[ys.length-1]:String(ys[0]);
   return S.t==="fogo"?`O ponto escolhido queimou ${ys.length===1?"uma vez":ys.length+" vezes"}: em ${lista}.`:`O ponto escolhido foi desmatado em ${lista}${S.pt.some(p=>p.v===6)?" (vegetação que já tinha se regenerado)":""}.`;}
@@ -1319,28 +1323,32 @@ function barSVG(S){const W0=400,H0=190,ml=44,mr=8,mt=10,mb=24,pw=W0-ml-mr,ph=H0-
   s+=`<text x="${ml}" y="${mt-1}" class="ct" font-size="10">ha</text></svg>`;return s;}
 function mbxHTML(S,area,t){const M=MBX[t];
   const head=`<p class="mbxh"><span class="ic" style="background:${t==="fogo"?"#e8590c":"#c92a2a"}">${ICON(t)}</span>${t==="fogo"?"Queimadas":"Desmatamento"} ${M.y0}–${M.y1}</p>`;
-  if(!S)return head+`<p class="empty">${navigator.onLine?"Não foi possível ler os mapas do MapBiomas agora. Tente de novo mais tarde.":"Sem internet: os mapas de queimada e desmatamento são lidos na hora na Plataforma MapBiomas."}</p>`;
+  if(!S)return head+`<p class="empty">${navigator.onLine?"Não foi possível ler os mapas do MapBiomas agora. Tente de novo mais tarde.":"Sem internet e sem a cópia guardada para este local. Com Wi-Fi, toque em \"Baixar mapa da Bahia\" no fim da página para usar no campo."}</p>`;
   const st=mbxStats(S);let h=head;const pt=mbxPtTxt(S);if(pt)h+=`<p style="margin:0"><strong>${esc(pt)}</strong></p>`;
   h+=`<p style="margin:0">${esc(mbxText(S,area))}</p>`;
   h+=t==="fogo"?`<div class="fstat"><div><b>${haTxt(S.onceHa)}</b><span>queimaram pelo menos 1 vez (${pcTxt(S.onceHa,S.totHa)})</span></div><div><b>${haTxt(S.recHa)}</b><span>queimaram 3 vezes ou mais</span></div><div><b>${haTxt(st.s5)}</b><span>queimados de ${st.l5[0].yr} a ${st.y1}</span></div></div>`
     :`<div class="fstat"><div><b>${haTxt(S.onceHa)}</b><span>desmatados de ${st.y0} a ${st.y1} (${pcTxt(S.onceHa,S.totHa)})</span></div><div><b>${haTxt(st.s5)}</b><span>desmatados de ${st.l5[0].yr} a ${st.y1}</span></div><div><b>${st.max.yr||"–"}</b><span>ano com mais desmatamento</span></div></div>`;
   if(st.tot)h+=`<figure class="chart bchart"><figcaption>${t==="fogo"?"Área queimada":"Área desmatada"} por ano (hectares)</figcaption>${Object.keys(M.cls).length>1?`<div class="ckeys">${Object.values(M.cls).map(c=>`<span><i style="background:#${c[1]};height:10px"></i>${esc(c[0])}</span>`).join("")}</div>`:""}${barSVG(S)}</figure>
     <details><summary>Ver tabela por ano</summary><div class="tscroll"><table class="tbl"><thead><tr><th>Ano</th><th>Área (ha)</th><th>% da ${area}</th>${Object.keys(M.cls).length>1?Object.values(M.cls).map(c=>`<th>${esc(c[0].split(" (")[0])} (ha)</th>`).join(""):""}</tr></thead><tbody>${S.rows.slice().reverse().map(r=>`<tr><td>${r.yr}</td><td>${r.ok?fmtN(r.ha,1):"sem leitura"}</td><td>${r.ok?pcTxt(r.ha,S.totHa):"–"}</td>${Object.keys(M.cls).length>1?Object.keys(M.cls).map(k=>`<td>${fmtN(r.cls[k]||0,1)}</td>`).join(""):""}</tr>`).join("")}</tbody></table></div></details>`;
-  h+=`<p class="empty" style="font-size:13px">${esc(M.src)}, lido agora na Plataforma MapBiomas em pixels de cerca de ${S.pxm} m. Área analisada: ${haTxt(S.totHa)}.${S.fail?` ${S.fail} ano(s) não puderam ser lidos (marcados com ?).`:""}${t==="desm"?" Na Caatinga, parte da perda mapeada pode ser roçado de agricultura tradicional; confira com a comunidade.":" O fogo pode ser queimada de manejo, incêndio ou queima para desmatar; confira com a comunidade."}</p>`;
+  h+=S.grid?`<p class="empty" style="font-size:13px">${esc(M.src)}. Valores da cópia guardada no app (grade de cerca de ${S.pxm} m feita a partir dos mapas de 30 m; "pelo menos uma vez" e "3 vezes ou mais" são estimativas). Área analisada: ${haTxt(S.totHa)}.</p>`:`<p class="empty" style="font-size:13px">${esc(M.src)}, lido agora na Plataforma MapBiomas em pixels de cerca de ${S.pxm} m. Área analisada: ${haTxt(S.totHa)}.${S.fail?` ${S.fail} ano(s) não puderam ser lidos (marcados com ?).`:""}${t==="desm"?" Na Caatinga, parte da perda mapeada pode ser roçado de agricultura tradicional; confira com a comunidade.":" O fogo pode ser queimada de manejo, incêndio ou queima para desmatar; confira com a comunidade."}</p>`;
   return h;}
-function mbxSectionHTML(){return `<section class="blk"><h3>Queimadas e desmatamento (MapBiomas)</h3>${["fogo","desm"].map(t=>`<div id="mbx_${t}">${navigator.onLine?`<p class="mbxh"><span class="ic" style="background:${t==="fogo"?"#e8590c":"#c92a2a"}">${ICON(t)}</span>${t==="fogo"?"Queimadas":"Desmatamento"} ${MBX[t].y0}–${MBX[t].y1}</p><div class="loading" style="padding:4px 0"><span class="spin"></span>Lendo os mapas anuais do MapBiomas… <span class="prog"></span></div>`:mbxHTML(null,"",t)}</div>`).join("")}</section>`;}
+function mbxSectionHTML(){return `<section class="blk"><h3>Queimadas e desmatamento (MapBiomas)</h3>${["fogo","desm"].map(t=>`<div id="mbx_${t}"><p class="mbxh"><span class="ic" style="background:${t==="fogo"?"#e8590c":"#c92a2a"}">${ICON(t)}</span>${t==="fogo"?"Queimadas":"Desmatamento"} ${MBX[t].y0}–${MBX[t].y1}</p><div class="loading" style="padding:4px 0"><span class="spin"></span>Lendo os mapas anuais do MapBiomas… <span class="prog"></span></div></div>`).join("")}</section>`;}
 /* dispara a leitura das duas séries e preenche a seção; o resultado fica em o.mbx */
 function mbxStart(o,test,bb,pt,cheap,area){o.mbx={};const out=$("out");out.__mbx=o;
-  const run=t=>mbxSeries(t,test,bb,pt,cheap,(d,n)=>{if(out.__mbx!==o)return;const el=document.querySelector(`#mbx_${t} .prog`);if(el)el.textContent=`${d} de ${n} anos`;}).catch(()=>null)
-    .then(S=>{o.mbx[t]=S;if(out.__mbx===o){const el=$("mbx_"+t);if(el)el.innerHTML=mbxHTML(S,area,t);}return S;});
-  return navigator.onLine?Promise.all([run("fogo"),run("desm")]):Promise.resolve([null,null]);}
+  const put=(t,S,extra)=>{if(out.__mbx!==o)return;const el=$("mbx_"+t);if(el)el.innerHTML=mbxHTML(S,area,t)+(extra||"");};
+  const run=async t=>{const G=await mbxSeriesGrid(t,test,bb,pt).catch(()=>null);if(G)o.mbx[t]=G;
+    if(!navigator.onLine){put(t,G);return G;}
+    if(G)put(t,G,`<div class="loading" style="padding:4px 0"><span class="spin"></span>Refinando com os pixels de 30 m da Plataforma MapBiomas… <span class="prog"></span></div>`);
+    const S=await mbxSeries(t,test,bb,pt,cheap,(d,n)=>{if(out.__mbx!==o)return;const el=document.querySelector(`#mbx_${t} .prog`);if(el)el.textContent=`${d} de ${n} anos`;}).catch(()=>null);
+    if(S&&S.fail<=S.rows.length/3){o.mbx[t]=S;put(t,S);}else put(t,G,G?`<p class="hintsmall">Não foi possível ler os pixels de 30 m agora; os números acima são da cópia guardada no app.</p>`:"");return o.mbx[t]||null;};
+  return Promise.all([run("fogo"),run("desm")]);}
 function barPNG(S){const M=MBX[S.t],ks=Object.keys(M.cls),c=document.createElement("canvas"),W0=1400,H0=460,ml=110,mr=20,mt=30,mb=50,pw=W0-ml-mr,ph=H0-mt-mb,n=S.rows.length;c.width=W0;c.height=H0;const g=c.getContext("2d");
   g.fillStyle="#fff";g.fillRect(0,0,W0,H0);const mx=Math.max(1,...S.rows.map(r=>r.ha)),nice=niceMax(mx),Y=v=>mt+(1-v/nice)*ph,bw=pw/n;
   g.font="22px Helvetica, Arial";g.strokeStyle="#e2e5dd";g.lineWidth=2;g.fillStyle="#5a635d";g.textAlign="right";for(const fr of [0,.5,1]){const v=nice*fr;g.beginPath();g.moveTo(ml,Y(v));g.lineTo(ml+pw,Y(v));g.stroke();g.fillText(fmtN(v)+" ha",ml-10,Y(v)+7);}
   S.rows.forEach((r,i)=>{let y0=Y(0);ks.forEach(k=>{const v=r.cls[k]||0;if(!v)return;const h=Math.max(2,v/nice*ph);g.fillStyle="#"+M.cls[k][1];g.fillRect(ml+i*bw+bw*.12,y0-h,bw*.76,h);y0-=h;});
     if(r.yr%5===0){g.fillStyle="#5a635d";g.textAlign="center";g.fillText(r.yr,ml+i*bw+bw/2,H0-14);}});return c.toDataURL("image/jpeg",0.9);}
 function mbxPDF(T,IMG2,TABLE,o,area){const F=o.mbx&&o.mbx.fogo,D=o.mbx&&o.mbx.desm;
-  if(!F&&!D){T("Os mapas de queimada e desmatamento do MapBiomas não puderam ser lidos (eles exigem internet no momento da consulta).",9.5);return;}
+  if(!F&&!D){T("Os mapas de queimada e desmatamento do MapBiomas não estão disponíveis para este local (sem internet e sem a cópia guardada no celular).",9.5);return;}
   for(const [t,S] of [["fogo",F],["desm",D]]){const M=MBX[t];T(`${t==="fogo"?"Queimadas":"Desmatamento"} ${M.y0}–${M.y1}`,10.5,"bold");if(!S){T("Não foi possível ler esta série.",9.5);continue;}
     const pt=mbxPtTxt(S);if(pt)T(pt,10,"bold");T(mbxText(S,area),9.5);if(mbxStats(S).tot)IMG2(barPNG(S),`${t==="fogo"?"Área queimada":"Área desmatada"} por ano, em hectares, na ${area}.${t==="desm"?" Vermelho: vegetação primária; laranja: vegetação secundária.":""} Fonte: ${M.src}; pixels de cerca de ${S.pxm} m.`);}
   const ys=[];for(let y=1985;y<=2025;y++)ys.push(y);const g=(S,y)=>{if(!S)return "–";const r=S.rows.find(r=>r.yr===y);return r?(r.ok?fmtN(r.ha,1):"?"):"–";};
@@ -1348,6 +1356,36 @@ function mbxPDF(T,IMG2,TABLE,o,area){const F=o.mbx&&o.mbx.fogo,D=o.mbx&&o.mbx.de
   T("O fogo pode ser queimada de manejo, incêndio ou queima para desmatar. Na Caatinga, parte do desmatamento mapeado pode ser roçado de agricultura tradicional. Confirme com a comunidade.",8.5,"italic",[70,78,72]);}
 function mbxData(o){const f=t=>{const S=o.mbx&&o.mbx[t];if(!S)return null;const st=mbxStats(S);return {anos:`${st.y0}-${st.y1}`,areaAnalisadaHa:Math.round(S.totHa),totalHa:Math.round(S.onceHa),ultimos5anosHa:Math.round(st.s5),piorAno:st.max.yr||null,noPonto:S.pt?S.pt.map(p=>p.yr):null,porAno:S.rows.filter(r=>r.ok&&r.ha>0.05).map(r=>`${r.yr}: ${Math.round(r.ha)} ha`)};};
   return {queimadas:f("fogo"),desmatamento:f("desm")};}
+
+/* ---------- cópia guardada de queimadas e desmatamento (grade de ~550 m, para uso sem internet) ---------- */
+let QIDX=null;const QC=new Map(),QIMG=new Map();
+async function qIndex(){if(QIDX)return QIDX;try{const r=await fetch(DATA_URL+"q/index.json");if(!r.ok)return null;QIDX=await r.json();}catch(e){return null;}return QIDX;}
+function loadQTile(k){if(QC.has(k))return QC.get(k);const p=(async()=>{const I=await qIndex();if(!I||!I.tiles.includes(k))return null;const r=await fetch(DATA_URL+"q/"+k+".gz");if(!r.ok)return null;return await gunzip(await r.arrayBuffer());})().catch(()=>null);
+  QC.set(k,p);if(QC.size>40){for(const kk of QC.keys()){QC.delete(kk);if(QC.size<=30)break;}}return p;}
+/* mesma estrutura de mbxSeries, calculada na grade guardada; "pelo menos uma vez" e "3 vezes ou mais" são estimados a partir da fração de cada célula em cada ano */
+async function mbxSeriesGrid(t,test,bb,pt){const I=await qIndex();if(!I)return null;const N=I.N,NN=N*N,c=1/N,M=MBX[t],Q=I.Q||250;
+  const ys=t==="fogo"?I.fogo:I.desm,ny=ys.length,offs=t==="fogo"?[0]:[I.fogo.length,I.fogo.length+I.desm.length],nl=offs.length;
+  const keys=tilesFor(bb.w,bb.s,bb.e,bb.n);const arrs=await Promise.all(keys.map(loadQTile));if(arrs.every(a=>!a))return null;
+  const cellHa=(KXf((bb.s+bb.n)/2)*c)*(KY*c)*100,tot=new Float64Array(ny*nl),p=new Float64Array(ny);let ncell=0,once=0,rec=0,ptRow=null;
+  keys.forEach((k,ti)=>{const A=arrs[ti];if(!A)return;const [tx,ty]=k.split("_").map(Number);
+    const i0=Math.max(0,Math.floor((bb.w-tx)*N)),i1=Math.min(N-1,Math.floor((bb.e-tx)*N)),j0=Math.max(0,Math.floor((ty+1-bb.n)*N)),j1=Math.min(N-1,Math.floor((ty+1-bb.s)*N));
+    for(let j=j0;j<=j1;j++){const cy=ty+1-(j+.5)*c;for(let i=i0;i<=i1;i++){const cx=tx+(i+.5)*c;if(!test(cx,cy))continue;ncell++;const q=j*N+i;
+      for(let y=0;y<ny;y++){let s=0;for(let l=0;l<nl;l++){const v=A[(offs[l]+y)*NN+q]/Q;tot[y*nl+l]+=v;s+=v;}p[y]=Math.min(1,s);}
+      let none=1,d0=1,d1=0,d2=0;for(let y=0;y<ny;y++){const f=p[y];if(!f)continue;none*=1-f;const n2=d2*(1-f)+d1*f,n1=d1*(1-f)+d0*f;d0*=1-f;d1=n1;d2=n2;}
+      once+=1-none;rec+=Math.max(0,1-d0-d1-d2);}}});
+  if(!ncell)return null;
+  if(pt){const k=Math.floor(pt[0])+"_"+Math.floor(pt[1]),ti=keys.indexOf(k),A=ti>=0?arrs[ti]:null;if(A){const [tx,ty]=k.split("_").map(Number);const q=Math.min(N-1,Math.floor((ty+1-pt[1])*N))*N+Math.min(N-1,Math.floor((pt[0]-tx)*N));
+    ptRow=ys.map((yr,y)=>{const v=offs.map(o=>A[(o+y)*NN+q]);const m=Math.max(...v);return m?{yr,v:t==="fogo"?1:(v[0]>=v[1]?4:6),f:v.reduce((a,b)=>a+b,0)/Q}:null;}).filter(Boolean);}}
+  const ck=Object.keys(M.cls);
+  const rows=ys.map((yr,y)=>{const cls={};let ha=0;for(let l=0;l<nl;l++){const v=tot[y*nl+l]*cellHa;cls[ck[l]]=v;ha+=v;}return {yr,ha,cls,pt:0,ok:true};});
+  return {t,years:ys,rows,totHa:ncell*cellHa,onceHa:once*cellHa,recHa:rec*cellHa,pxm:Math.round(111320/N/50)*50,fail:0,pt:pt?(ptRow||[]):null,grid:true,when:new Date()};}
+function qImg(k,t,yr){const key=k+t+yr;if(QIMG.has(key))return QIMG.get(key);QIMG.set(key,null);
+  (async()=>{const I=await qIndex();const A=await loadQTile(k);if(!I||!A)return;const N=I.N,NN=N*N,K=250/(I.Q||250),cv2=document.createElement("canvas");cv2.width=N;cv2.height=N;const g=cv2.getContext("2d"),d=g.createImageData(N,N),D=d.data;
+    if(t==="fogo"){const b=I.fogo.indexOf(yr);if(b<0)return;for(let q=0;q<NN;q++){const v=A[b*NN+q];if(!v)continue;D[q*4]=FIRE_RGB[0];D[q*4+1]=FIRE_RGB[1];D[q*4+2]=FIRE_RGB[2];D[q*4+3]=Math.min(255,70+v*K*.8);}}
+    else{const b=I.desm.indexOf(yr);if(b<0)return;const o1=(I.fogo.length+b)*NN,o2=(I.fogo.length+I.desm.length+b)*NN;for(let q=0;q<NN;q++){const a=A[o1+q],s2=A[o2+q];if(!a&&!s2)continue;const col=a>=s2?[234,28,28]:[254,153,52];D[q*4]=col[0];D[q*4+1]=col[1];D[q*4+2]=col[2];D[q*4+3]=Math.min(255,70+(a+s2)*K*.8);}}
+    g.putImageData(d,0,0);QIMG.set(key,cv2);draw();})().catch(()=>{});
+  if(QIMG.size>240){for(const kk of QIMG.keys()){QIMG.delete(kk);if(QIMG.size<=180)break;}}return null;}
+function drawQGrid(c,t,yr){for(const k of tilesFor(view.w,view.s,view.e,view.n)){const im=qImg(k,t,yr);if(!im)continue;const [tx,ty]=k.split("_").map(Number);c.drawImage(im,px(tx),py(ty+1),px(tx+1)-px(tx),py(ty)-py(ty+1));}}
 
 /* ---------- CEFIR coletivo (PCT) no ponto ---------- */
 function pctAt(a){const m=new Map();for(const c of a.car.coll)if(c.tipo==="PCT"&&c.d===0&&c.st!=="CA")m.set(c.cod,c);
@@ -1371,19 +1409,24 @@ function buildSearch(){const it=[];
   AS.forEach(o=>it.push({k:"as",o,n:o.name,s:"Assentamento (INCRA)"+(o.ano?" · "+o.ano:""),tipo:"Assentamento"}));
   UC.filter(u=>/RESEX|RDS|Reserva Extrativista|Desenvolvimento Sustent/i.test((u.sig||"")+" "+(u.cat||"")+" "+u.name)).forEach(o=>it.push({k:"uc",o,n:o.name,s:"Unidade de conservação para populações tradicionais",tipo:"Extrativista"}));
   CARC.filter(c=>c.tipo==="PCT"&&c.st!=="CA").forEach(o=>{const lg=(o.liga||"").replace(/^(Território quilombola|Terra indígena|Assentamento do INCRA): /,"").replace(/^Dentro do assentamento do INCRA /,"");
-    it.push({k:"pct",o,n:lg?`CEFIR coletivo · ${lg}`:`CEFIR coletivo · ${o.mun}`,s:`Povo ou comunidade tradicional no CAR · ${o.mun} · ${fmtN(o.area,1)} ha · ${o.cod}`,extra:o.mun+" "+o.cod+" fundo fecho pasto pct comunidade tradicional"});});
+    it.push({k:"pct",o,n:lg?`CEFIR coletivo · ${lg}`:`Fundo/Fecho de Pasto ou comunidade tradicional · ${o.mun}`,s:`CEFIR coletivo (PCT) · ${o.mun} · ${fmtN(o.area,1)} ha · ${o.cod.slice(0,10)}…${o.cod.slice(-6)}`,extra:o.mun+" "+o.cod+" fundo de pasto fecho de pasto pct cefir coletivo comunidade tradicional"});});
   SIDXN=it.map(x=>Object.assign(x,{key:normS(x.n+" "+(x.extra||"")+" "+x.s)}));}
-function searchTerr(q){const Q=normS(q);if(Q.length<2)return [];const words=Q.split(" ");
+/* busca aproximada: ignora acentos e aceita pequenos erros de digitação em cada palavra */
+function lev1(a,b,max){if(Math.abs(a.length-b.length)>max)return max+1;let prev=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const cur=[i];let mn=i;for(let j=1;j<=b.length;j++){cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));if(cur[j]<mn)mn=cur[j];}if(mn>max)return max+1;prev=cur;}return prev[b.length];}
+const STOP=new Set(["de","da","do","das","dos","e","a","o"]);
+function wordScore(w,toks,key){if(key.includes(w))return 0;const max=w.length>=7?2:w.length>=4?1:0;if(!max)return 9;let best=9;for(const t of toks){const pre=t.slice(0,Math.max(w.length,1)+0);const d=Math.min(lev1(w,t,max),lev1(w,pre,max));if(d<best)best=d;if(!best)break;}return best<=max?best:9;}
+function searchTerr(q){const Q=normS(q);if(Q.length<2)return [];const words=Q.split(" ").filter(w=>!STOP.has(w));if(!words.length)return [];
   const own=TERRS.map(t=>({k:"own",t,n:t.nome,s:`Território guardado neste celular · ${t.tipo||""}${t.mun&&t.mun.length?" · "+t.mun.join(", "):""}`,key:normS(t.nome+" "+(t.tipo||"")+" "+(t.mun||[]).join(" ")+" "+(t.cod||""))}));
   const all=[...own,...(SIDXN||[])];const res=[];
-  for(const x of all){if(!words.every(w=>x.key.includes(w)))continue;const nk=normS(x.n);const sc=(nk.startsWith(Q)?0:nk.includes(Q)?1:2)+(x.k==="own"?-0.5:0)+(x.k==="as"?0.3:0);res.push([sc,x]);}
-  return res.sort((a,b)=>a[0]-b[0]||a[1].n.localeCompare(b[1].n,"pt")).slice(0,12).map(r=>r[1]);}
+  for(const x of all){if(!x.toks)x.toks=[...new Set(x.key.split(" "))];let sc=0,ok=true;for(const w of words){const d=wordScore(w,x.toks,x.key);if(d>2){ok=false;break;}sc+=d;}if(!ok)continue;
+    const nk=normS(x.n);sc+=(nk.startsWith(Q)?0:nk.includes(Q)?0.5:1.5)+(x.k==="own"?-1:0)+(x.k==="as"?0.3:0);res.push([sc,x]);}
+  return res.sort((a,b)=>a[0]-b[0]||a[1].n.localeCompare(b[1].n,"pt")).slice(0,30).map(r=>r[1]);}
 const SCOL={ti:"#a0522d",qu:"#7b3fa0",as:"#c27c0e",uc:"#2e7d32",pct:"#00897b",own:"#d81b60"};
 function initSearch(){const inp=$("tbusca"),ul=$("tbres");if(!inp)return;let cur=[];
   const show=()=>{if(!B){ul.hidden=false;ul.innerHTML=`<li class="none">Carregando os dados…</li>`;return;}if(!SIDXN)buildSearch();cur=searchTerr(inp.value);
     if(normS(inp.value).length<2){ul.hidden=true;return;}ul.hidden=false;
     ul.innerHTML=cur.length?cur.map((x,i)=>`<li><button type="button" data-i="${i}"><span class="ic" style="--c:${SCOL[x.k]}">${ICON(x.k==="own"?"ter":x.k)}</span><span><b>${esc(x.n)}</b><small>${esc(x.s)}</small></span></button></li>`).join("")
-      :`<li class="none">Nada encontrado. Tente outra parte do nome ou o município. Fundos e fechos de pasto sem CEFIR só aparecem se a equipe tiver inserido o território no app.</li>`;
+      :`<li class="none">Nada encontrado. Tente outra parte do nome ou o município. As bases públicas não trazem o nome dos Fundos e Fechos de Pasto: busque "fundo de pasto" e o município, ou insira o território com o nome da comunidade (ele passa a aparecer na busca).</li>`;
     ul.querySelectorAll("button").forEach(b=>b.onclick=()=>pick(cur[+b.dataset.i]));};
   const pick=x=>{ul.hidden=true;inp.value=x.n;say("");
     if(x.k==="own"){const t=x.t;openSaved(t);return;}

@@ -50,7 +50,8 @@ h1{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,6vw,40px);l
 canvas#map{display:block;width:100%;height:min(60vh,580px);min-height:330px;touch-action:none;cursor:crosshair;border-radius:14px 14px 0 0;background:var(--mapbg)}
 .mapctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
 .mapctl button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow);padding:0}
-.mapctl button svg{width:22px;height:22px}
+.mapctl button svg{width:22px;height:22px;color:var(--accent);stroke-width:2.4}
+#zme{background:var(--accent)!important;border-color:var(--accent)!important}#zme svg{color:#fff}
 .mapctl .sep{height:4px}
 .maphint{position:absolute;left:10px;top:10px;background:var(--card);border:1px solid var(--line);padding:6px 10px;border-radius:10px;font-size:13px;color:var(--mute);max-width:70%;box-shadow:var(--shadow)}
 .maphint.pct{background:var(--pct);border-color:var(--pct);color:#fff;font-weight:700}
@@ -191,7 +192,9 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .seg{display:inline-flex;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px}
 .seg button{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:14px;border:0;background:transparent;color:var(--ink);border-radius:9px;padding:7px 10px;min-height:38px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--card);color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.seg button svg.i{width:18px;height:18px}
+.seg button svg.i{width:26px;height:26px;padding:4px;border-radius:8px;color:#fff;background:var(--bc,#6f7a73);stroke-width:2.2}
+.seg button[data-b="branco"]{--bc:#7d8a83}.seg button[data-b="sat"]{--bc:#1f6fbf}.seg button[data-b="terreno"]{--bc:#8a6d00}
+.seg button[aria-pressed="true"] svg.i{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--bc)}
 .yr select{min-height:42px;padding:6px 10px;font-size:15px;border-radius:12px;background:var(--paper)}
 .layers{padding:6px 14px 14px}
 .layers>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;font-weight:700}
@@ -203,14 +206,14 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .lgrp h4{margin:6px 0 6px;font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
 .lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .lg{display:flex;align-items:center;gap:8px;font-family:inherit;font-size:13.5px;line-height:1.2;text-align:left;border:1px solid var(--line);border-radius:12px;padding:7px 9px;background:var(--card);color:var(--ink);cursor:pointer;min-height:46px;width:100%}
-.lg .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,white);color:var(--c);flex:none}
-.lg .ic svg.i{width:18px;height:18px}
+.lg .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--c);color:#fff;flex:none;box-shadow:0 2px 5px color-mix(in srgb,var(--c) 40%,transparent)}
+.lg .ic svg.i{width:20px;height:20px;stroke-width:2.2}
 .lg .t{flex:1;min-width:0}
 .lg .ck{width:18px;height:18px;border-radius:5px;border:2px solid var(--line);display:grid;place-items:center;flex:none;color:#fff}
 .lg .ck svg{width:12px;height:12px;stroke-width:3.2;opacity:0}
 .lg[aria-pressed="true"]{border-color:color-mix(in srgb,var(--c) 45%,var(--line));background:color-mix(in srgb,var(--c) 5%,white)}
 .lg[aria-pressed="true"] .ck{background:var(--accent);border-color:var(--accent)}.lg[aria-pressed="true"] .ck svg{opacity:1}
-.lg[aria-pressed="false"]{color:var(--mute)}.lg[aria-pressed="false"] .ic{background:var(--paper);color:#9aa59f}
+.lg[aria-pressed="false"]{color:var(--mute)}.lg[aria-pressed="false"] .ic{background:color-mix(in srgb,var(--c) 13%,white);color:var(--c);box-shadow:none}
 .lg .net{font-size:11px;color:var(--mute);display:block;font-weight:400}
 .lall{display:flex;gap:6px}.lall button{font-family:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 10px;cursor:pointer;color:var(--ink)}
 /* busca por nome */
@@ -222,7 +225,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .sres li button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;font-family:inherit;font-size:15px;background:transparent;border:0;border-bottom:1px solid var(--line);padding:9px 12px;cursor:pointer;color:var(--ink)}
 .sres li:last-child button{border-bottom:0}
 .sres li button:hover,.sres li button:focus-visible{background:var(--accent-soft);outline:none}
-.sres .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,white);color:var(--c);flex:none}
+.sres .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--c);color:#fff;flex:none}
 .sres .ic svg.i{width:18px;height:18px}
 .sres b{display:block;font-weight:700}.sres small{color:var(--mute);font-size:13px}
 .sres .none{padding:10px 12px;color:var(--mute);font-size:14px}
@@ -364,7 +367,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke
 
   <div class="panel ask" style="margin-top:18px">
     <h2>Usar sem internet</h2>
-    <p class="hintsmall">Baixe o mapa da Bahia inteira e a série histórica do MapBiomas com Wi-Fi antes de ir a campo. Depois as consultas funcionam sem sinal, e os registros ficam guardados até a internet voltar.</p>
+    <p class="hintsmall">Baixe o mapa da Bahia inteira, a série histórica do MapBiomas e os mapas de queimadas e desmatamento com Wi-Fi antes de ir a campo. Depois as consultas funcionam sem sinal, e os registros ficam guardados até a internet voltar.</p>
     <div class="row"><button type="button" class="btn" id="offbtn">Baixar mapa da Bahia</button></div>
     <p class="msg" id="offmsg" role="status"></p>
     <p class="hintsmall"><a href="instalar.html">Página de instalação</a> · envie esse link para outras pessoas instalarem o aplicativo.</p>
@@ -376,8 +379,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="config.js?v=170"></script>
-<script src="app.js?v=170"></script>
+<script src="config.js?v=181"></script>
+<script src="app.js?v=181"></script>
 <script>
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
 let deferredInstall=null;const ib=document.getElementById("install");
