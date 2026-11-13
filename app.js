@@ -53,6 +53,12 @@ const ENFASE = {
 };
 const enTxt = f => (ENFASE[f]||{txt:f||"Fase não informada."}).txt;
 const enCol = f => (ENFASE[f]||{c:"#9fb1f5"}).c;
+/* nomes do CEFIR coletivo (INEMA/GeoBahia): "COMUNIDADE PAU FERRO" -> "Comunidade Pau Ferro" */
+function nomeBonito(n){n=String(n||"").replace(/\s+/g," ").trim();if(!n)return "";const low=new Set(["de","da","do","das","dos","e","em","na","no","nas","nos","a","o"]);
+  return n.toLowerCase().split(" ").map((w,i)=>i&&low.has(w)?w:w.replace(/(^|[-/(])([a-zà-ü])/g,(m,a,b)=>a+b.toUpperCase())).join(" ");}
+const segCurto=s=>/fundos e fechos/i.test(s||"")?"Fundo e fecho de pasto":/quilomb/i.test(s||"")?"Comunidade quilombola":/geraiz/i.test(s||"")?"Geraizeiros":/extrativ/i.test(s||"")?"Extrativistas":/terreiro/i.test(s||"")?"Povos de terreiro":"Povo ou comunidade tradicional";
+const segTipo=s=>/fundos e fechos/i.test(s||"")?"Fundo e fecho de pasto":/quilomb/i.test(s||"")?"Quilombola":/geraiz/i.test(s||"")?"Geraizeira":/extrativ/i.test(s||"")?"Extrativista":"Outra comunidade tradicional";
+const pctNome=c=>c.nm||`CEFIR coletivo · ${c.mun}`;
 const titular = n => n==="#PF" ? "Pessoa física (nome não exibido)" : (n||"Não informado na base");
 const TIPOS = ["Fundo e fecho de pasto","Quilombola","Indígena","Pescadores artesanais","Marisqueiras","Ribeirinha","Geraizeira","Extrativista","Assentamento","Outra comunidade tradicional"];
 const REGTIPOS = ["Mineração ou garimpo","Parque eólico ou solar","Linha de transmissão","Desmatamento ou queimada","Cerca ou grilagem","Água (barragem, poço, rio secando)","Agrotóxico","Ameaça ou violência","Outro"];
@@ -76,7 +82,7 @@ async function loadBase(){
   QU = B.qu.map(([n,proc,area,g,fora])=>mkFeat({kind:"qu",name:n,proc,area,g,fora:fora||0}));
   AS = B.as.map(([n,ano,sipra,g,fora])=>mkFeat({kind:"as",name:n,ano,sipra,g,fora:fora||0}));
   SA = B.sa.map(([n,g])=>mkPt({name:n,g}));
-  CARC = B.carc.map(r=>mkFeat({tipo:r[0],st:r[1],cond:r[2],mun:r[3],area:r[4],mf:r[5],criado:r[6],cod:r[7],g:r[8],liga:r[9]||""}));
+  CARC = B.carc.map(r=>mkFeat({tipo:r[0],st:r[1],cond:r[2],mun:r[3],area:r[4],mf:r[5],criado:r[6],cod:r[7],g:r[8],liga:r[9]||"",nm:nomeBonito(r[10]||""),seg:r[11]||"",fam:r[12]||0}));
   EOLP = B.eolp.map(([n,mw,fase,g])=>mkFeat({name:n,mw,fase,tipo:"EOL",g}));
   ENP = B.enp.map(([n,tipo,fase,mw,extra,g])=>mkPt({name:n,tipo,fase,mw,extra,g}));
   LTE = B.lte.map(([n,ano,dono,kv,g])=>{const o={name:n,ano,dono,kv,g,plan:false};o.r=dec(g);o.bb=bboxR(o.r);return o;});
@@ -506,7 +512,7 @@ function apPDF(T,L,pre){AP_GRP.forEach(g=>{const it=L.filter(g.f);if(!it.length)
   it.forEach(x=>T(`${pre(x)} | ${x.name} | ${x.info||""}`,9));T(g.note,8,"italic",[70,78,72]);});}
 function tag(d){return d===0?'<span class="tag in">No ponto</span>':`<span class="tag near">${fmtKm(d)}</span>`;}
 function summary(a){const S=[];
-  const pc=pctAt(a);if(pc.length)S.push({k:"in",b:"PCT",t:`ponto dentro de CEFIR coletivo de comunidade tradicional${pc.length>1?" ("+pc.length+" cadastros)":""}`});
+  const pc=pctAt(a);if(pc.length)S.push({k:"in",b:"PCT",t:pc[0].nm?`ponto dentro de ${pc[0].nm} (${segCurto(pc[0].seg).toLowerCase()})`:`ponto dentro de CEFIR coletivo de comunidade tradicional${pc.length>1?" ("+pc.length+" cadastros)":""}`});
   const mc=a.minIn.length,mn=a.minNear.length;
   S.push({k:mc?"in":(mn?"near":"none"),b:mc||mn,t:mc?`processo${mc>1?"s":""} de mineração sobre o ponto`:(mn?`processo${mn>1?"s":""} de mineração no raio`:"sem mineração no raio")});
   const eIn=a.enR.filter(e=>e.d===0).length,eN=a.enR.length;
@@ -580,7 +586,7 @@ function carSection(a){const C=a.car;let h=`<section class="blk"><h3>CAR / CEFIR
   if(C.at==null&&C.p1==null)return h+`<p class="empty">Sem dados do CAR para este local.</p></section>`;
   h+=`<p style="margin:0" id="carat">${C.at?"Pela cópia guardada no app, há imóvel do CAR sobre este ponto. Confirmando no SICAR…":"Pela cópia guardada no app, não há imóvel do CAR sobre este ponto. Confirmando no SICAR…"}</p><div id="carfull"><div class="loading" style="padding:8px 0"><span class="spin"></span>Buscando todos os cadastros do raio no SICAR…</div></div>`;
   if(C.p1!=null)h+=`<div class="bars" id="carraster"><div class="bar"><span>Área do raio com CAR (cópia guardada)</span><div class="track"><div class="fill" style="width:${C.p1}%;background:#7f95b3"></div></div><span class="v">${pf(C.p1)}</span></div></div>`;
-  C.coll.forEach(c=>{h+=`<div class="item">${tag(c.d)}<div><p class="what">${c.tipo==="PCT"?"CEFIR coletivo de povo ou comunidade tradicional (PCT)":"Cadastro de assentamento no CAR (AST)"} · ${esc(c.mun)} · ${fmtN(c.area,1)} ha</p>${c.liga?`<p class="meta">${c.tipo==="AST"?"Corresponde ao":"Fica dentro do"} ${esc(c.liga.replace(/^(Assentamento do INCRA|Território quilombola|Terra indígena): /,(m,k)=>k.toLowerCase()+" "))}</p>`:""}
+  C.coll.forEach(c=>{h+=`<div class="item">${tag(c.d)}<div><p class="what">${c.tipo==="PCT"?(c.nm?esc(c.nm)+" · "+esc(segCurto(c.seg)):"CEFIR coletivo de povo ou comunidade tradicional (PCT)"):"Cadastro de assentamento no CAR (AST)"} · ${esc(c.mun)} · ${fmtN(c.area,1)} ha${c.fam?" · "+c.fam+" famílias":""}</p>${c.liga?`<p class="meta">${c.tipo==="AST"?"Corresponde ao":"Fica dentro do"} ${esc(c.liga.replace(/^(Assentamento do INCRA|Território quilombola|Terra indígena): /,(m,k)=>k.toLowerCase()+" "))}</p>`:""}
     <p class="meta">${esc(c.cod)} · ${c.st==="CA"?"cancelado":esc((c.cond||"").toLowerCase())} · cadastrado em ${esc((c.criado||"").split("-").reverse().join("/"))}</p>
     ${c.ovPct!=null?`<p class="plain">Cerca de ${pf(c.ovPct)} deste território também está declarado como imóvel rural individual no CAR.</p>`:""}
     ${c.tipo==="PCT"&&c.st!=="CA"?`<button type="button" class="btn sm" data-usepct="${esc(c.cod)}">Analisar este território</button>`:""}</div></div>`;});
@@ -595,6 +601,7 @@ const SOURCES=[
   "Uso e cobertura da terra: MapBiomas Coleção 11 (mapas anuais de 1985 a 2025, resolução original de 30 m), lidos da Plataforma MapBiomas em 23/10/2026. A série histórica usa uma grade de cerca de 550 m e o mapa de 2025 uma grade de cerca de 220 m.",
   "Queimadas: MapBiomas Fogo Coleção 5 (área queimada anual de 1985 a 2025, 30 m, produzida sobre a Coleção 11 de uso e cobertura), lida na hora da Plataforma MapBiomas.",
   "Desmatamento: MapBiomas Coleção 11, módulo Perda de Vegetação Nativa (supressão anual de vegetação primária e secundária de 1987 a 2025, 30 m), lido na hora da Plataforma MapBiomas.",
+  "Nomes, segmentos (Fundo e Fecho de Pasto, quilombolas e outros) e número de famílias dos CEFIR coletivos: INEMA, GeoBahia (camada PCT – Territórios do CEFIR), lida em 13/11/2026.",
   "CAR/CEFIR: SICAR (Serviço Florestal Brasileiro), camada pública da Bahia, que recebe os cadastros do CEFIR/INEMA, incluindo os coletivos de povos e comunidades tradicionais. A lista completa do raio é consultada no SICAR no momento da consulta; sem internet, o aplicativo usa a cópia de 23/10/2026 dos coletivos e grandes imóveis (mais de 15 módulos fiscais)."
 ];
 $("foot").textContent="Versão de teste em campo. Os dados vêm de bases públicas oficiais e podem estar desatualizados ou incompletos. Estar perto de um processo ou projeto não significa que haverá obra ou mina: cada etapa explica o que já foi autorizado. Nomes de pessoas físicas são ocultados. Os dados pessoais, registros e territórios são enviados para uma pasta restrita da equipe no Google Drive; enquanto não há internet, ficam guardados neste celular. A leitura do relatório em áudio será incluída na fase final.";
@@ -674,7 +681,7 @@ async function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent=
   T("Olho no Território",20,"bold");T("Relatório de consulta por ponto · Bahia",10,"normal",[90,99,93]);
   T(`Coordenadas: ${a.y.toFixed(5)}, ${a.x.toFixed(5)}`,11,"bold");
   T(`${a.mun?"Município: "+a.mun+" (BA)":"Município não identificado"}   Raio: ${a.R} km   Data: ${a.when.toLocaleString("pt-BR")}   Origem do ponto: ${sel&&sel.how||""}`,10);
-  {const pc=pctAt(a);if(pc.length)T(`ATENÇÃO: o ponto está dentro de ${pc.length>1?pc.length+" cadastros coletivos":"cadastro coletivo"} de povo ou comunidade tradicional no CEFIR/CAR (PCT): ${pc.map(c=>c.cod+" ("+c.mun+", "+fmtN(c.area,1)+" ha"+(c.liga?"; "+c.liga:"")+")").join("; ")}. Obras e empreendimentos aqui devem passar por consulta livre, prévia e informada (Convenção 169 da OIT).`,10.5,"bold",[0,105,92]);}
+  {const pc=pctAt(a);if(pc.length)T(`ATENÇÃO: o ponto está dentro de ${pc.length>1?pc.length+" cadastros coletivos":"cadastro coletivo"} de povo ou comunidade tradicional no CEFIR/CAR (PCT): ${pc.map(c=>(c.nm?c.nm+", "+segCurto(c.seg)+(c.fam?", "+c.fam+" famílias":"")+" – ":"")+c.cod+" ("+c.mun+", "+fmtN(c.area,1)+" ha"+(c.liga?"; "+c.liga:"")+")").join("; ")}. Obras e empreendimentos aqui devem passar por consulta livre, prévia e informada (Convenção 169 da OIT).`,10.5,"bold",[0,105,92]);}
   const span=Math.max(a.R*3.2,6)/111;{pm.textContent="Montando o mapa do relatório…";const sn=await snapshotA({w:a.x-span/2,e:a.x+span/2,s:a.y-span/2,n:a.y+span/2},true);IMG(sn.img,"Mapa: o ponto consultado está no centro; o círculo tracejado mostra o raio de busca.");LEGEND(sn.leg,BASES[BASE].attr?"Fundo do mapa: "+BASES[BASE].attr+".":"");}
   H2("Conflito e ameaça territorial");a.idx=threatIndex({mode:"pt",a});idxPDF(T,a.idx);H2("Resumo");summary(a).forEach(s=>T(`• ${s.b} ${s.t}`,10.5));
   H2("Mineração (ANM/SIGMINE)");const all=[...a.minIn,...a.minNear];
@@ -690,7 +697,7 @@ async function makePDF(a){const pm=$("pdfmsg");if(!window.jspdf){pm.textContent=
   T(a.sa.length?`Sítios arqueológicos no raio: ${a.sa.length} (mais próximo: ${a.sa[0].name}, a ${fmtKm(a.sa[0].d)}).`:"Nenhum sítio arqueológico cadastrado no raio.",9.5);
   H2("CAR / CEFIR (SICAR)");T((a.car.at?"Há imóvel rural do CAR declarado sobre o ponto":"Nenhum imóvel rural do CAR declarado sobre o ponto")+(a.car.live?" (consulta ao SICAR no momento do relatório).":" (cópia guardada no app; sem confirmação no SICAR)."),10,"bold");
   if(CL&&CL.cov)carResumoPDF(T,CL,false,"");else if(a.car.p1!=null)T(`Pela cópia guardada no app (células de 220 m), ${P(a.car.p1)} da área do raio tem imóvel do CAR declarado.`,9.5);
-  a.car.coll.forEach(c=>T(`${c.d===0?"NO PONTO":"a "+fmtKm(c.d)} | ${c.tipo==="PCT"?"CEFIR coletivo (PCT)":"Cadastro de assentamento (AST)"} | ${c.mun} | ${fmtN(c.area,1)} ha | ${c.cod} | ${c.st==="CA"?"cancelado":c.cond}${c.liga?" | "+c.liga:""}${c.ovPct!=null?` | ${P(c.ovPct)} da área também declarada como imóvel individual`:""}`,9));
+  a.car.coll.forEach(c=>T(`${c.d===0?"NO PONTO":"a "+fmtKm(c.d)} | ${c.tipo==="PCT"?"CEFIR coletivo (PCT)"+(c.nm?": "+c.nm+" ("+segCurto(c.seg)+(c.fam?", "+c.fam+" famílias":"")+")":""):"Cadastro de assentamento (AST)"} | ${c.mun} | ${fmtN(c.area,1)} ha | ${c.cod} | ${c.st==="CA"?"cancelado":c.cond}${c.liga?" | "+c.liga:""}${c.ovPct!=null?` | ${P(c.ovPct)} da área também declarada como imóvel individual`:""}`,9));
   if(CL&&CL.list.length){T(`Lista completa: ${fmtN(CL.list.length)} cadastros do CAR encostam no raio (consulta ao SICAR em ${CL.when.toLocaleString("pt-BR")}).${CL.trunc?` O raio tem ${fmtN(CL.matched)} cadastros; a lista traz os primeiros ${fmtN(CL.list.length)}.`:""}`,9.5);carTablePDF(TABLE,CL);}
   else{T("A lista completa do CAR não pôde ser consultada (sem internet ou SICAR fora do ar). Cadastros coletivos e grandes imóveis guardados no aplicativo:",9);a.car.big.forEach(b=>T(`${b.d===0?"NO PONTO":"a "+fmtKm(b.d)} | Grande imóvel | ${fmtN(b.area)} ha (${b.mf} MF) | ${b.cod} | ${b.mun}`,9));}
   T("O CAR é autodeclarado e a maioria dos cadastros aguarda análise do INEMA. Confirme cada caso com a comunidade.",8.5,"italic",[70,78,72]);
@@ -751,7 +758,7 @@ $("tdraw").onclick=()=>{drawPts=[];drawbar.hidden=false;tformEl.hidden=true;updD
 $("tundo").onclick=()=>{if(drawPts&&drawPts.length){drawPts.pop();updDraw();draw();}};
 $("tcancel").onclick=()=>{drawPts=null;drawbar.hidden=true;$("hint").textContent="Toque no mapa para escolher um ponto";draw();};
 $("tdone").onclick=()=>{if(!drawPts||drawPts.length<3){tsay("Marque pelo menos 3 cantos.",true);return;}const ring=[...drawPts,drawPts[0]].map(([x,y])=>[+x.toFixed(6),+y.toFixed(6)]);drawPts=null;drawbar.hidden=true;$("hint").textContent="Toque no mapa para escolher um ponto";startTerritory({rings:[ring],name:"",origem:"desenho"});};
-function useCarPct(c){if(!c)return;startTerritory({rings:c.r,name:`CEFIR coletivo · ${c.mun}`,cod:c.cod,origem:"SICAR",tipo:""});}
+function useCarPct(c){if(!c)return;startTerritory({rings:c.r,name:pctNome(c),cod:c.cod,origem:"SICAR",tipo:c.seg?segTipo(c.seg):""});}
 function startTerritory(t){curT=Object.assign({saved:false},t);curT.bb=bboxR(curT.rings);fitTo(curT.bb);sel=null;draw();
   tformEl.hidden=false;tformEl.className="tform";
   tformEl.innerHTML=`<label>Nome do território<input id="tnome" value="${esc(t.name||"")}" placeholder="Ex.: Fundo de pasto Lagoa do Mato"></label>
@@ -817,7 +824,7 @@ function renderTerritory(r){const t=r.t,out=$("out"),d=r.when.toLocaleDateString
   h+=`<section class="blk"><h3>CAR / CEFIR dentro do território</h3><div id="tcarfull"><div class="loading" style="padding:8px 0"><span class="spin"></span>Buscando no SICAR todos os cadastros que se sobrepõem ao território…</div></div><div id="tcarraster"><div class="bars"><div class="bar"><span>Com imóvel do CAR (cópia guardada)</span><div class="track"><div class="fill" style="width:${r.car.pct}%;background:#7f95b3"></div></div><span class="v">${pf(r.car.pct)}</span></div></div>
     <p style="margin:0;color:var(--mute);font-size:14px">Pela cópia guardada no celular (células de 220 m), cerca de ${fmtN(r.car.ha)} ha do território têm imóvel do CAR declarado. Com internet, o app troca esse número pela conta exata no SICAR.</p></div>`;
   r.car.big.forEach(b=>{h+=`<div class="item"><span class="tag in">${pf(b.pct)}</span><div><p class="what">Grande imóvel · ${fmtN(b.area)} ha no total (${String(b.mf).replace(".",",")} módulos fiscais)</p><p class="meta">${esc(b.cod)} · cobre cerca de ${fmtN(b.ha)} ha do território</p></div></div>`;});
-  r.car.coll.forEach(c=>{h+=`<div class="item"><span class="tag near">${pf(c.pct)}</span><div><p class="what">${c.tipo==="PCT"?"Outro CEFIR coletivo (PCT)":"Cadastro de assentamento no CAR (AST)"}${c.st==="CA"?" · cancelado":""}</p><p class="meta">${esc(c.cod)} · ${esc(c.mun)} · ${fmtN(c.area,1)} ha${c.liga?" · "+esc(c.liga):""}</p></div></div>`;});
+  r.car.coll.forEach(c=>{h+=`<div class="item"><span class="tag near">${pf(c.pct)}</span><div><p class="what">${c.tipo==="PCT"?(c.nm?"Outro CEFIR coletivo: "+esc(c.nm):"Outro CEFIR coletivo (PCT)"):"Cadastro de assentamento no CAR (AST)"}${c.st==="CA"?" · cancelado":""}</p><p class="meta">${esc(c.cod)} · ${esc(c.mun)} · ${fmtN(c.area,1)} ha${c.liga?" · "+esc(c.liga):""}</p></div></div>`;});
   h+=`<p class="plain">Imóvel individual dentro de território coletivo pode ser lote de morador ou indicar conflito ou grilagem. A comunidade deve conferir cada caso. Os cadastros são autodeclarados e a maioria aguarda análise do INEMA.</p></section>`;
   h+=`<section class="blk"><h3>Mineração</h3>`;
   if(!r.min.length)h+=`<p class="empty">Nenhum processo minerário sobre o território.</p>`;
@@ -858,7 +865,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   H2("CAR / CEFIR");if(t.cod)T(`CAR/CEFIR do território: ${t.cod}${t.dono?" · titular ou responsável informado: "+t.dono:""}`,10,"bold");else if(t.dono)T(`Titular ou responsável informado: ${t.dono}`,10,"bold");if(r.carL&&r.carL.cov)carResumoPDF(T,r.carL,true,t.cod||"");else T(`Pela cópia guardada no app (células de 220 m), ${P(r.car.pct)} do território (cerca de ${fmtN(r.car.ha)} ha) tem imóvel do CAR declarado. Não foi possível confirmar no SICAR.`,10);
   if(r.carL&&r.carL.list.length){const L={...r.carL,list:r.carL.list.filter(c=>c.cod!==t.cod)};T(`${fmtN(L.list.length)} cadastro(s) do CAR se sobrepõem ao território (consulta ao SICAR em ${r.carL.when.toLocaleString("pt-BR")}). A coluna "% do território" mostra a parte do território coberta por cada um.`,9.5);carTablePDF(TABLE,L,true);}
   r.car.big.forEach(b=>T(`Grande imóvel ${b.cod} (${fmtN(b.area)} ha, ${b.mf} MF): cobre cerca de ${fmtN(b.ha)} ha (${P(b.pct)}) do território.`,9.5));
-  r.car.coll.forEach(c=>T(`${c.tipo==="PCT"?"Outro CEFIR coletivo (PCT)":"Cadastro de assentamento (AST)"} ${c.cod}${c.st==="CA"?" (cancelado)":""}: ${P(c.pct)} do território${c.liga?". "+c.liga:""}.`,9.5));
+  r.car.coll.forEach(c=>T(`${c.tipo==="PCT"?"Outro CEFIR coletivo (PCT)"+(c.nm?" "+c.nm:""):"Cadastro de assentamento (AST)"} ${c.cod}${c.st==="CA"?" (cancelado)":""}: ${P(c.pct)} do território${c.liga?". "+c.liga:""}.`,9.5));
   T("O CAR é autodeclarado e a maioria dos cadastros aguarda análise do INEMA. Confira cada caso com a comunidade.",8.5,"italic",[70,78,72]);
   H2("Mineração (ANM/SIGMINE)");if(!r.min.length)T("Nenhum processo minerário sobre o território.");else{T(`${r.min.length} processo(s) sobre ${P(r.minPct)} do território. `+Object.entries(STAGE).filter(([k])=>r.stage[k]).map(([k,v])=>`${v.n}: ${P(r.stage[k])}`).join("; ")+".",10);
     minTablePDF(TABLE,r.min,true);T("O que significa cada fase:",9.5,"bold");[...new Set(r.min.map(m=>m.fase))].forEach(f=>T(`• ${f}: ${(FASE[f]||{}).txt||""}`,8.5));}
@@ -877,7 +884,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),indice:idxData(r.idx),...mbxData(r),conflitoRelatado:!!t.conflito,carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.8.0";
+const VER="1.8.1";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -978,7 +985,7 @@ function renderCfg(){const c=$("cfg");c.innerHTML=`<label>Endereço do script (t
 async function cacheAll(){const b=$("offbtn"),m=$("offmsg");if(!("caches" in window)){m.textContent="Este navegador não guarda o mapa para uso sem internet.";return;}
   const urls=[DATA_URL+"base.json",DATA_URL+"lu/overview.png"];B.tiles.forEach(([k,nm,nb,lu])=>{urls.push(DATA_URL+"t/"+k+".json");if(lu)urls.push(DATA_URL+"lu/"+k+".png",DATA_URL+"car/"+k+".png",DATA_URL+"s/"+k+".gz");});urls.push(DATA_URL+"s/index.json");
   try{const I=await fetch(DATA_URL+"q/index.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null);if(I){urls.push(DATA_URL+"q/index.json");I.tiles.forEach(k=>urls.push(DATA_URL+"q/"+k+".gz"));}}catch(e){}
-  b.disabled=true;let done=0,fail=0;const c=await caches.open("ot-dados-v5");
+  b.disabled=true;let done=0,fail=0;const c=await caches.open("ot-dados-v6");
   const work=async()=>{while(urls.length){const u=urls.shift();try{if(!(await c.match(u))){const r=await fetch(u,{cache:"no-cache"});if(r.ok)await c.put(u,r);else fail++;}}catch(e){fail++;}done++;m.textContent=`Baixando o mapa: ${Math.round(done/(done+urls.length)*100)}%`;}};
   await Promise.all([work(),work(),work(),work()]);b.disabled=false;
   m.textContent=fail?`Faltaram ${fail} arquivos. Tente de novo com internet melhor.`:"Mapa da Bahia guardado no celular, com a série do MapBiomas, as queimadas e o desmatamento. As consultas funcionam sem internet.";if(!fail)lsSet("ot_offline",new Date().toISOString());}
@@ -1391,13 +1398,13 @@ function drawQGrid(c,t,yr){for(const k of tilesFor(view.w,view.s,view.e,view.n))
 function pctAt(a){const m=new Map();for(const c of a.car.coll)if(c.tipo==="PCT"&&c.d===0&&c.st!=="CA")m.set(c.cod,c);
   if(a.carL)for(const c of a.carL.list)if(c.tipo==="PCT"&&c.d===0&&c.st!=="CA"&&!m.has(c.cod))m.set(c.cod,Object.assign({liga:""},c));return [...m.values()];}
 function pctAlertHTML(a){const L=pctAt(a);if(!L.length)return "";
-  return `<div class="pctalert" role="alert"><span class="ic">${ICON("pct")}</span><div><h3>Este ponto está dentro de ${L.length>1?L.length+" territórios":"um território"} de povo ou comunidade tradicional</h3>
+  return `<div class="pctalert" role="alert"><span class="ic">${ICON("pct")}</span><div><h3>Este ponto está dentro de ${L.length>1?L.length+" territórios":"um território"} de ${L.every(c=>/fundos e fechos/i.test(c.seg||""))?"Fundo e Fecho de Pasto":"povo ou comunidade tradicional"}</h3>
     <p>Há ${L.length>1?"cadastros coletivos":"cadastro coletivo"} no CEFIR/CAR (tipo PCT) cobrindo o ponto escolhido${a.car.live?" (confirmado no SICAR agora)":""}.</p>
-    ${L.map(c=>`<p><strong class="mono">${esc(c.cod)}</strong> · ${esc(c.mun||"")} · ${fmtN(c.area,1)} ha · ${esc(CST[c.st]||c.st||"")}${c.liga?` · ${esc(c.liga)}`:""}</p>`).join("")}
+    ${L.map(c=>`${c.nm?`<p style="font-size:16px"><strong>${esc(c.nm)}</strong> · ${esc(segCurto(c.seg))}${c.fam?` · ${c.fam} famílias`:""}</p>`:""}<p><span class="mono">${esc(c.cod)}</span> · ${esc(c.mun||"")} · ${fmtN(c.area,1)} ha · ${esc(CST[c.st]||c.st||"")}${c.liga?` · ${esc(c.liga)}`:""}</p>`).join("")}
     <p>Qualquer obra ou empreendimento aqui atinge diretamente essa comunidade e deve passar por consulta livre, prévia e informada (Convenção 169 da OIT).</p>
     <div class="row">${L.map(c=>`<button type="button" class="btn sm" data-usepct="${esc(c.cod)}">Analisar ${L.length>1?esc(c.cod.slice(-6)):"este território"}</button>`).join("")}</div></div></div>`;}
 function pctAlertUpd(a){const el=$("pctalert");if(!el)return;el.innerHTML=pctAlertHTML(a);el.querySelectorAll("[data-usepct]").forEach(b=>b.onclick=()=>usePctCod(a,b.dataset.usepct));
-  const n=pctAt(a).length,h=$("hint");if(h){h.classList.toggle("pct",!!n);if(n)h.textContent="Ponto dentro de CEFIR coletivo (PCT)";}if(n)say("Atenção: este ponto fica dentro de um CEFIR coletivo de povo ou comunidade tradicional (PCT). Veja o aviso no resultado.");}
+  const n=pctAt(a).length,h=$("hint");if(h){h.classList.toggle("pct",!!n);if(n){const c0=pctAt(a)[0];h.textContent=c0.nm?`Dentro de: ${c0.nm}`:"Ponto dentro de CEFIR coletivo (PCT)";}}if(n)say("Atenção: este ponto fica dentro de um CEFIR coletivo de povo ou comunidade tradicional (PCT). Veja o aviso no resultado.");}
 function usePctCod(a,cod){const c=CARC.find(x=>x.cod===cod)||(a&&a.carL&&a.carL.list.find(x=>x.cod===cod));if(c)useCarPct(c);}
 
 /* ---------- busca de territórios pelo nome ---------- */
@@ -1409,7 +1416,9 @@ function buildSearch(){const it=[];
   AS.forEach(o=>it.push({k:"as",o,n:o.name,s:"Assentamento (INCRA)"+(o.ano?" · "+o.ano:""),tipo:"Assentamento"}));
   UC.filter(u=>/RESEX|RDS|Reserva Extrativista|Desenvolvimento Sustent/i.test((u.sig||"")+" "+(u.cat||"")+" "+u.name)).forEach(o=>it.push({k:"uc",o,n:o.name,s:"Unidade de conservação para populações tradicionais",tipo:"Extrativista"}));
   CARC.filter(c=>c.tipo==="PCT"&&c.st!=="CA").forEach(o=>{const lg=(o.liga||"").replace(/^(Território quilombola|Terra indígena|Assentamento do INCRA): /,"").replace(/^Dentro do assentamento do INCRA /,"");
-    it.push({k:"pct",o,n:lg?`CEFIR coletivo · ${lg}`:`Fundo/Fecho de Pasto ou comunidade tradicional · ${o.mun}`,s:`CEFIR coletivo (PCT) · ${o.mun} · ${fmtN(o.area,1)} ha · ${o.cod.slice(0,10)}…${o.cod.slice(-6)}`,extra:o.mun+" "+o.cod+" fundo de pasto fecho de pasto pct cefir coletivo comunidade tradicional"});});
+    const ffp=/fundos e fechos/i.test(o.seg),qq=/quilomb/i.test(o.seg);
+    it.push({k:"pct",o,n:o.nm||(lg?`CEFIR coletivo · ${lg}`:`CEFIR coletivo · ${o.mun}`),s:`${o.seg?segCurto(o.seg):"Povo ou comunidade tradicional"} · ${o.mun}${o.fam?` · ${o.fam} famílias`:""} · ${fmtN(o.area,1)} ha · CEFIR coletivo`,
+      extra:o.mun+" "+o.cod+" "+lg+" pct cefir coletivo comunidade tradicional "+(ffp?"fundo de pasto fecho de pasto fundos fechos":"")+(qq?" quilombo quilombola":"")+(!o.seg?" fundo de pasto fecho de pasto":"")});});
   SIDXN=it.map(x=>Object.assign(x,{key:normS(x.n+" "+(x.extra||"")+" "+x.s)}));}
 /* busca aproximada: ignora acentos e aceita pequenos erros de digitação em cada palavra */
 function lev1(a,b,max){if(Math.abs(a.length-b.length)>max)return max+1;let prev=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const cur=[i];let mn=i;for(let j=1;j<=b.length;j++){cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));if(cur[j]<mn)mn=cur[j];}if(mn>max)return max+1;prev=cur;}return prev[b.length];}
