@@ -653,7 +653,7 @@ function pdfDoc(){const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",form
   if(BANNER){try{const w=52,h=w*463/554;doc.addImage(BANNER,"JPEG",(210-w)/2,8,w,h);st.y=8+h+8;}catch(e){}}
   const need=h=>{if(st.y+h>282){doc.addPage();st.y=18;}};
   const T=(s,sz=10,f="normal",col=[27,33,30])=>{doc.setFont("helvetica",f);doc.setFontSize(sz);doc.setTextColor(...col);const L=doc.splitTextToSize(String(s),PW);need(L.length*sz*0.42+1);doc.text(L,M,st.y);st.y+=L.length*sz*0.42+1.5;};
-  const H2=s=>{st.y+=3;need(12);doc.setDrawColor(200);doc.line(M,st.y-2,M+PW,st.y-2);T(s,13,"bold",[22,128,95]);};
+  const H2=s=>{st.y+=3;need(16);doc.setLineDashPattern([],0);doc.setLineWidth(0.3);doc.setDrawColor(200);doc.line(M,st.y,M+PW,st.y);st.y+=6.5;T(s,13,"bold",[22,128,95]);st.y+=0.5;};
   const IMG=(img,cap)=>{need(PW*0.62+8);doc.addImage(img,"JPEG",M+PW*0.19,st.y,PW*0.62,PW*0.62);st.y+=PW*0.62+5;T(cap,8,"normal",[90,99,93]);};
   const FIN=(name)=>{const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(120);doc.text(`Olho no Território · versão de teste · página ${i} de ${n}`,M,290);}return doc.output("blob");};
   const IMG2=(img,cap)=>{const h=PW*0.4;need(h+12);doc.addImage(img,"JPEG",M,st.y,PW,h);st.y+=h+2;T(cap,8,"normal",[90,99,93]);};
@@ -884,7 +884,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),indice:idxData(r.idx),...mbxData(r),conflitoRelatado:!!t.conflito,carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.8.1";
+const VER="1.8.2";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
