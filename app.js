@@ -289,6 +289,12 @@ function drawNow(c,opts){
     for(const m of MUN){if(!vis(m.bb))continue;const cx=Math.max(view.w,Math.min(view.e,(m.bb.w+m.bb.e)/2)),cy=Math.max(view.s,Math.min(view.n,(m.bb.s+m.bb.n)/2));if(inPoly(cx,cy,m.r))c.fillText(m.name,px(cx),py(cy));}c.globalAlpha=1;}
   if(sel&&!opts.noSel){const X=px(sel.x),Y=py(sel.y);const rp=sel.R/KXf(sel.y)/(view.e-view.w)*W;c.beginPath();c.arc(X,Y,rp,0,7);c.strokeStyle=css("--accent");c.lineWidth=2;c.setLineDash([5,4]);c.stroke();c.setLineDash([]);c.fillStyle=css("--accent")+"14";c.fill();
     c.beginPath();c.arc(X,Y,8,0,7);c.fillStyle=css("--accent");c.fill();c.strokeStyle="#fff";c.lineWidth=3;c.stroke();}
+  /* casa da comunidade informada no cadastro */
+  const CL=typeof PESSOA!=="undefined"&&PESSOA&&PESSOA.local;
+  if(CL&&CL.lat!=null&&!opts.noSel&&CL.lon>=view.w&&CL.lon<=view.e&&CL.lat>=view.s&&CL.lat<=view.n){const X=px(CL.lon),Y=py(CL.lat),col=CL.situacao==="nova"?"#d9480f":"#2e7d32";
+    c.save();c.beginPath();c.moveTo(X,Y-13);c.lineTo(X+10,Y-4);c.lineTo(X+7,Y-4);c.lineTo(X+7,Y+7);c.lineTo(X-7,Y+7);c.lineTo(X-7,Y-4);c.lineTo(X-10,Y-4);c.closePath();
+    c.fillStyle=col;c.fill();c.strokeStyle="#fff";c.lineWidth=2.5;c.lineJoin="round";c.stroke();
+    if(!opts.noLabels){c.font="700 12px "+css("--f-body");c.textAlign="left";c.lineWidth=3;c.strokeStyle="#fff";const t=CL.comunidade||"Minha comunidade";c.strokeText(t,X+12,Y+4);c.fillStyle=col;c.fillText(t,X+12,Y+4);}c.restore();}
 }
 function visTiles(){return tilesFor(view.w,view.s,view.e,view.n).map(loaded).filter(Boolean);}
 let reqT=null;
@@ -884,7 +890,7 @@ async function makeTerrPDF(r){const pm=$("tpdfmsg");if(!window.jspdf){pm.textCon
   if(!t.saved)await saveTerritory(t,r);const sent=sendReport(blob,fname,{tipoRelatorio:"territorio",territorioId:t.id||"",nome:t.name,tipo:t.tipo||"",cod:t.cod||"",titularInformado:t.dono||"",areaHa:+r.area.toFixed(1),municipios:r.mun,resumo:terrSummary(r),indice:idxData(r.idx),...mbxData(r),conflitoRelatado:!!t.conflito,carSobrepostos:r.carL?r.carL.list.filter(c=>c.cod!==t.cod).map(c=>c.cod+" ("+(c.pct<1?"<1":Math.round(c.pct))+"%)"):[]});
   savePDF(blob,fname).then(async m=>{pm.textContent=m+" "+(await sent);}).catch(async()=>pm.textContent="Não foi possível baixar o PDF. "+(await sent));}
 /* ---------- cadastro da pessoa, banco local e envio para o Google Drive ---------- */
-const VER="1.8.2";
+const VER="1.9.1";
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -914,10 +920,21 @@ function showGate(novo){
     <label>Data de nascimento<input id="pnasc" type="date" min="1900-01-01" max="${new Date().toISOString().slice(0,10)}" value="${esc(p&&p.nascimento||"")}"></label>
     <label>Nome da comunidade<input id="pcom" maxlength="140" value="${esc(p&&p.comunidade||"")}" placeholder="Ex.: Fundo de pasto Lagoa do Mato"></label>
     <label>Município<input id="pmun" list="munlist" autocomplete="off" maxlength="80" value="${esc(p&&p.municipio||"")}" placeholder="Comece a digitar e escolha da lista"></label>
+    <fieldset class="comloc" id="comloc">
+      <legend>Onde fica a comunidade</legend>
+      <p class="hintsmall">Serve para colocar a comunidade no mapa do projeto. Se ela ficar fora dos territórios já mapeados, entra no painel como <b>nova comunidade a mapear</b>.</p>
+      <button type="button" class="btn primary" id="plgps">Estou na comunidade: usar minha localização</button>
+      <label>Ou cole coordenadas ou um link de mapa<span class="row"><input id="plcoord" autocomplete="off" placeholder="-10.5445, -40.4047" style="flex:1 1 180px;min-width:0;font-family:var(--f-mono);font-size:15px"><button type="button" class="btn" id="plgo">Usar</button></span></label>
+      <label for="plbusca">Ou busque o território da comunidade pelo nome</label>
+      <div class="search"><div class="ib"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="plbusca" type="search" autocomplete="off" placeholder="Quilombo, fundo de pasto, terra indígena…"></div><ul class="sres" id="plres" hidden></ul></div>
+      <div id="plbox" role="status"></div>
+      <label class="chk"><input type="checkbox" id="pldepois"${p&&p.local&&p.local.situacao==="sem"?" checked":""}> <span>Agora não sei informar. Vou indicar depois.</span></label>
+    </fieldset>
     <div class="consent"><p><strong>Para que servem esses dados.</strong> Seu nome, CPF, data de nascimento, comunidade e município ficam guardados junto com as informações que você registrar neste aplicativo, para que a ${esc(CFG.org)} saiba quem fez cada registro e possa entrar em contato. Os dados vão para uma pasta de acesso restrito da equipe e não serão divulgados nem vendidos. Você pode pedir para corrigir ou apagar seus dados a qualquer momento.</p>
     <label class="chk"><input type="checkbox" id="pok"${p&&p.consentimento?" checked":""}> <span>Li e concordo com o uso dos meus dados para esse fim.</span></label></div>
     <div class="row"><button type="button" class="btn primary" id="psave">${p?"Salvar alterações":"Salvar e começar"}</button>${PESSOA?`<button type="button" class="btn" id="pcancel">Voltar</button>`:""}</div>
     <p class="msg" id="pmsg" role="status"></p>`;
+  initComLoc(p&&p.local&&p.local.situacao!=="sem"?p.local:null);
   const cpf=$("pcpf");cpf.addEventListener("input",()=>{const c=cpf.selectionStart===cpf.value.length;cpf.value=cpfFmt(cpf.value);if(c)cpf.selectionStart=cpf.selectionEnd=cpf.value.length;});
   if($("pcancel"))$("pcancel").onclick=hideGate;
   $("psave").onclick=async()=>{const m=$("pmsg");const err=t=>{m.textContent=t;m.className="msg err";};
@@ -927,22 +944,84 @@ function showGate(novo){
     if(!nasc||nasc<"1900-01-01"||nasc>new Date().toISOString().slice(0,10))return err("Informe uma data de nascimento válida.");
     if(com.length<2)return err("Escreva o nome da comunidade.");
     const munOk=MUN.find(x=>normTxt(x.name)===normTxt(munv));if(!munOk)return err("Escolha o município da lista (municípios da Bahia).");
+    const depois=$("pldepois").checked;
+    if(!LOCD&&!depois){$("comloc").scrollIntoView({behavior:"smooth",block:"center"});return err("Indique onde fica a comunidade (localização, coordenadas ou busca pelo nome) ou marque que vai indicar depois.");}
     if(!$("pok").checked)return err("Para continuar, é preciso concordar com o uso dos dados.");
     const changed=!PESSOA||PESSOA.cpf!==cpfv;
-    PESSOA={id:changed?uid():PESSOA.id,nome,cpf:cpfv,nascimento:nasc,comunidade:com,municipio:munOk.name,consentimento:true,consentimentoEm:new Date().toISOString(),textoConsentimento:"v1"};
-    lsSet("ot_pessoa",PESSOA);await enqueue("cadastro",{});hideGate();};
-  setTimeout(()=>{const f=$("pnome");if(f&&!f.value)f.focus();},50);
+    const local=depois&&!LOCD?{situacao:"sem",em:new Date().toISOString()}:finalLoc(com);
+    PESSOA={id:changed?uid():PESSOA.id,nome,cpf:cpfv,nascimento:nasc,comunidade:com,municipio:munOk.name,local,consentimento:true,consentimentoEm:new Date().toISOString(),textoConsentimento:"v1"};
+    lsSet("ot_pessoa",PESSOA);await enqueue("cadastro",{comunidadeLocal:local});hideGate();draw();};
+  setTimeout(()=>{if(focoLocal){focoLocal=false;$("comloc").scrollIntoView({block:"center"});$("plbox").insertAdjacentHTML("afterbegin",`<p class="warnbox">Novo no aplicativo: indique onde fica a sua comunidade e toque em "Salvar alterações".</p>`);return;}const f=$("pnome");if(f&&!f.value)f.focus();},50);
 }
+
+/* localização da comunidade: cruza o ponto com os territórios já mapeados */
+let LOCD=null,focoLocal=false;
+const ufcUC=u=>/RESEX|RDS|Reserva Extrativista|Desenvolvimento Sustent/i.test((u.sig||"")+" "+(u.cat||"")+" "+u.name);
+function terrRef(k,o){
+  if(k==="ti")return {nome:o.name,tipo:"Terra indígena",fonte:"FUNAI",cod:""};
+  if(k==="qu")return {nome:o.name,tipo:"Território quilombola",fonte:"INCRA",cod:o.proc||""};
+  if(k==="as")return {nome:o.name,tipo:"Assentamento",fonte:"INCRA",cod:o.sipra||""};
+  if(k==="uc")return {nome:o.name,tipo:"Unidade de conservação de uso sustentável",fonte:"ICMBio/INEMA",cod:o.cnuc||""};
+  if(k==="pct")return {nome:pctNome(o),tipo:o.seg?segCurto(o.seg):"Povo ou comunidade tradicional",fonte:"CEFIR coletivo (INEMA/SICAR)",cod:o.cod||""};
+  return {nome:o.nome,tipo:o.tipo||"Território da comunidade",fonte:"Inserido no aplicativo",cod:o.cod||""};}
+function mappedAt(x,y){const hits=[],near=[];
+  const test=(k,o,rings,bb)=>{if(!rings||!rings.length)return;bb=bb||bboxR(rings);
+    if(bbD(bb,x,y)>5)return;const d=polyD(x,y,rings);if(d===0)hits.push(terrRef(k,o));else if(d<=5)near.push(Object.assign(terrRef(k,o),{km:d}));};
+  TI.forEach(o=>test("ti",o,o.r,o.bb));QU.forEach(o=>test("qu",o,o.r,o.bb));AS.forEach(o=>test("as",o,o.r,o.bb));
+  UC.filter(ufcUC).forEach(o=>test("uc",o,o.r,o.bb));CARC.filter(c=>c.tipo==="PCT"&&c.st!=="CA").forEach(o=>test("pct",o,o.r,o.bb));
+  TERRS.forEach(t=>test("own",t,t.rings));
+  const seen=new Set(),uniq=a=>a.filter(h=>{const k=h.nome+"|"+h.tipo;if(seen.has(k))return false;seen.add(k);return true;});
+  return {hits:uniq(hits),near:uniq(near.sort((a,b)=>a.km-b.km)).slice(0,3)};}
+function repPoint(rings){const bb=bboxR(rings);const cx=(bb.w+bb.e)/2,cy=(bb.s+bb.n)/2;if(inPoly(cx,cy,rings))return [cx,cy];
+  const r=rings[0];let sx=0,sy=0;r.forEach(p=>{sx+=p[0];sy+=p[1];});const ax=sx/r.length,ay=sy/r.length;if(inPoly(ax,ay,rings))return [ax,ay];
+  for(let i=1;i<=12;i++)for(let j=1;j<=12;j++){const x=bb.w+(bb.e-bb.w)*i/13,y=bb.s+(bb.n-bb.s)*j/13;if(inPoly(x,y,rings))return [x,y];}return [r[0][0],r[0][1]];}
+function setLocPoint(x,y,como,prec){
+  if(!inBahia(x,y)){LOCD=null;$("plbox").innerHTML=`<p class="warnbox">O ponto ${y.toFixed(5)}, ${x.toFixed(5)} fica fora da Bahia. Confira as coordenadas.</p>`;return;}
+  const m=mappedAt(x,y);LOCD={lat:+y.toFixed(6),lon:+x.toFixed(6),prec:prec?Math.round(prec):null,como,hits:m.hits,near:m.near,escolha:m.hits.length?0:-1};renderLoc();}
+function setLocTerr(x){const rings=x.k==="own"?x.t.rings:x.o.r;const [px_,py_]=repPoint(rings);const ref=x.k==="own"?terrRef("own",x.t):terrRef(x.k,x.o);
+  LOCD={lat:+py_.toFixed(6),lon:+px_.toFixed(6),prec:null,como:"busca pelo nome",hits:[ref],near:[],escolha:0};renderLoc();}
+function renderLoc(){const el=$("plbox");if(!LOCD){el.innerHTML="";return;}const L=LOCD;
+  const pt=`<span class="mono">${L.lat.toFixed(5)}, ${L.lon.toFixed(5)}</span>${L.prec?` · precisão de ~${L.prec} m`:""} · ${esc(L.como)}`;
+  if(L.hits.length){el.innerHTML=`<div class="locres in"><b>Este ponto está dentro de território já mapeado</b><span>${pt}</span>
+      ${L.hits.map((h,i)=>`<label class="chk"><input type="radio" name="plesc" value="${i}"${L.escolha===i?" checked":""}> <span>A comunidade é (ou faz parte de) <b>${esc(h.nome)}</b><small>${esc(h.tipo)} · ${esc(h.fonte)}</small></span></label>`).join("")}
+      <label class="chk"><input type="radio" name="plesc" value="-1"${L.escolha===-1?" checked":""}> <span>Não. É outra comunidade, que ainda não aparece no mapa<small>Vai para o painel como nova comunidade a mapear.</small></span></label></div>`;
+    el.querySelectorAll("input[name=plesc]").forEach(r=>r.onchange=()=>{L.escolha=+r.value;});}
+  else el.innerHTML=`<div class="locres new"><b>Fora dos territórios mapeados</b><span>${pt}</span><span>A comunidade vai aparecer no painel como <b>nova comunidade a mapear</b>.${L.near.length?` Território mapeado mais próximo: ${esc(L.near[0].nome)} (${esc(L.near[0].tipo)}), a ${fmtKm(L.near[0].km)}.`:" Nenhum território mapeado num raio de 5 km."}</span></div>`;
+  $("pldepois").checked=false;const pm=$("pmsg");if(pm&&pm.className.includes("err"))pm.textContent="";}
+function finalLoc(com){const L=LOCD,h=L.escolha>=0?L.hits[L.escolha]:null;
+  return {situacao:h?"mapeado":"nova",lat:L.lat,lon:L.lon,prec:L.prec,como:L.como,territorio:h,dentroDe:L.hits.map(x=>x.nome),proximo:!L.hits.length&&L.near.length?{nome:L.near[0].nome,tipo:L.near[0].tipo,km:+L.near[0].km.toFixed(2)}:null,comunidade:com,em:new Date().toISOString()};}
+function initComLoc(prev){
+  LOCD=prev&&prev.lat!=null?{lat:prev.lat,lon:prev.lon,prec:prev.prec,como:prev.como||"informado antes",...mappedAt(prev.lon,prev.lat),escolha:-1}:null;
+  if(LOCD&&prev.territorio){const i=LOCD.hits.findIndex(h=>h.nome===prev.territorio.nome);if(i>=0)LOCD.escolha=i;else{LOCD.hits.unshift(prev.territorio);LOCD.escolha=0;}}
+  renderLoc();
+  $("pldepois").onchange=e=>{if(e.target.checked){LOCD=null;renderLoc();}};
+  $("plgps").onclick=()=>{const b=$("plbox");if(!navigator.geolocation){b.innerHTML=`<p class="warnbox">Este aparelho não informou a localização. Cole as coordenadas ou busque pelo nome.</p>`;return;}
+    b.innerHTML=`<p class="hintsmall"><span class="spin" style="display:inline-block;vertical-align:middle"></span> Buscando sua localização…</p>`;let done=false;
+    const fail=()=>{if(done)return;done=true;b.innerHTML=`<p class="warnbox">Não foi possível pegar o GPS. Confira se a localização está ligada e permitida para este aplicativo, ou cole as coordenadas abaixo.</p>`;};const t=setTimeout(fail,30000);
+    try{navigator.geolocation.getCurrentPosition(p=>{if(done)return;done=true;clearTimeout(t);setLocPoint(p.coords.longitude,p.coords.latitude,"GPS",p.coords.accuracy);},()=>{clearTimeout(t);fail();},{timeout:28000,enableHighAccuracy:true,maximumAge:30000});}catch(e){clearTimeout(t);fail();}};
+  const go=()=>{const c=parseLoc($("plcoord").value);if(!c||c.err){$("plbox").innerHTML=`<p class="warnbox">${esc(c&&c.err||"Não entendi as coordenadas. Exemplo: -10.5445, -40.4047")}</p>`;return;}setLocPoint(c.lon,c.lat,"coordenadas");};
+  $("plgo").onclick=go;$("plcoord").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();go();}});
+  const inp=$("plbusca"),ul=$("plres");let cur=[];
+  inp.addEventListener("input",()=>{if(!SIDXN)buildSearch();cur=searchTerr(inp.value).slice(0,12);if(normS(inp.value).length<2){ul.hidden=true;return;}ul.hidden=false;
+    ul.innerHTML=cur.length?cur.map((x,i)=>`<li><button type="button" data-i="${i}"><span class="ic" style="--c:${SCOL[x.k]}">${ICON(x.k==="own"?"ter":x.k)}</span><span><b>${esc(x.n)}</b><small>${esc(x.s)}</small></span></button></li>`).join("")
+      :`<li class="none">Nenhum território mapeado com esse nome. Se a comunidade não aparece, use a localização ou as coordenadas: ela entra como nova comunidade.</li>`;
+    ul.querySelectorAll("button").forEach(b=>b.onclick=()=>{const x=cur[+b.dataset.i];ul.hidden=true;inp.value=x.n;setLocTerr(x);});});}
 function hideGate(){gate.hidden=true;app.hidden=false;renderWho();resize();}
 function renderWho(){const w=$("who");if(!PESSOA){w.innerHTML="";return;}
-  w.innerHTML=`<div class="nm"><b>${esc(PESSOA.nome)}</b><span>${esc(PESSOA.comunidade)} · ${esc(PESSOA.municipio)} · CPF ${cpfMask(PESSOA.cpf)}</span></div>
-    <button type="button" class="btn sm" id="wedit">Editar</button><button type="button" class="btn sm" id="wnew">Outra pessoa</button>`;
-  $("wedit").onclick=()=>showGate(false);$("wnew").onclick=()=>showGate(true);}
+  const L=PESSOA.local;
+  const loc=!L||L.situacao==="sem"?`<span class="locpill sem">Localização da comunidade não informada · <button type="button" class="lnk" id="wloc">indicar agora</button></span>`
+    :L.situacao==="mapeado"?`<span class="locpill in">Em território mapeado: ${esc(L.territorio&&L.territorio.nome)}</span>`
+    :`<span class="locpill new">Nova comunidade, fora dos territórios mapeados</span>`;
+  w.innerHTML=`<div class="nm"><b>${esc(PESSOA.nome)}</b><span>${esc(PESSOA.comunidade)} · ${esc(PESSOA.municipio)} · CPF ${cpfMask(PESSOA.cpf)}</span>${loc}</div>
+    ${L&&L.lat!=null?`<button type="button" class="btn sm" id="wver">Ver no mapa</button>`:""}<button type="button" class="btn sm" id="wedit">Editar</button><button type="button" class="btn sm" id="wnew">Outra pessoa</button>`;
+  $("wedit").onclick=()=>showGate(false);$("wnew").onclick=()=>showGate(true);
+  if($("wloc"))$("wloc").onclick=()=>{focoLocal=true;showGate(false);};
+  if($("wver"))$("wver").onclick=()=>{centerOn(L.lon,L.lat,0.25);draw();$("map").scrollIntoView({behavior:"smooth",block:"center"});};}
 
 /* fila de envio */
 let syncing=false,lastErr="",pend=0;
 async function enqueue(tipo,dados){
-  const item={id:uid(),tipo,criadoEm:new Date().toISOString(),app:VER,pessoa:PESSOA?{id:PESSOA.id,nome:PESSOA.nome,cpf:PESSOA.cpf,nascimento:PESSOA.nascimento,comunidade:PESSOA.comunidade,municipio:PESSOA.municipio,consentimentoEm:PESSOA.consentimentoEm}:null,dados};
+  const item={id:uid(),tipo,criadoEm:new Date().toISOString(),app:VER,pessoa:PESSOA?{id:PESSOA.id,nome:PESSOA.nome,cpf:PESSOA.cpf,nascimento:PESSOA.nascimento,comunidade:PESSOA.comunidade,municipio:PESSOA.municipio,local:PESSOA.local||null,consentimentoEm:PESSOA.consentimentoEm}:null,dados};
   try{await IDB.put(item);}catch(e){const q=lsGet("ot_fila_ls")||[];q.push(item);if(!lsSet("ot_fila_ls",q))throw new Error("Sem espaço no celular para guardar o envio.");}
   updSync();sync();return item.id;}
 async function pending(){let a=[];try{a=await IDB.all()||[];}catch(e){}return a.concat(lsGet("ot_fila_ls")||[]).sort((x,y)=>String(x.criadoEm).localeCompare(String(y.criadoEm)));}
@@ -1020,24 +1099,38 @@ function renderRegForm(){const f=$("rform");
   if(!sel){f.innerHTML=`<p class="hintsmall">Primeiro escolha o ponto: use sua localização, toque no mapa ou cole coordenadas.</p>`;return;}
   regFoto=null;
   f.innerHTML=`<div class="tform"><div class="mono">${sel.y.toFixed(5)}, ${sel.x.toFixed(5)}${lastA&&lastA.mun?" · "+esc(lastA.mun):""}${sel.acc?" · precisão "+Math.round(sel.acc)+" m":""}</div>
-    <label>O que foi visto<select id="rtipo">${REGTIPOS.map(x=>`<option>${x}</option>`).join("")}</select></label>
+    <label>Onde estou? (comunidade ou localidade)<input id="rlocal" list="rlocs" maxlength="140" autocomplete="off" placeholder="Ex.: Comunidade de Curral do Meio"><datalist id="rlocs"></datalist></label>
+    <p class="hintsmall" id="rlocinfo" style="margin-top:-4px"></p>
+    <label>Município<input id="rmun" list="munlist" maxlength="80" autocomplete="off" placeholder="Comece a digitar e escolha da lista"></label>
+    <label>O que foi visto (ameaça)<select id="rtipo">${REGTIPOS.map(x=>`<option>${x}</option>`).join("")}</select></label>
     <label>Descrição<textarea id="rtexto" maxlength="2000" placeholder="O que a equipe ou a comunidade relatou neste local"></textarea></label>
-    <label>Nº do CAR envolvido (se houver)<input id="rcar" maxlength="60" placeholder="BA-0000000-…"></label>
-    <label>Nome do titular do CAR (se souber)<input id="rdono" maxlength="160" placeholder="Para controle em caso de sobreposição"></label>
     <div class="row"><label class="btn sm" for="rfoto">Adicionar foto</label><input type="file" id="rfoto" accept="image/*" capture="environment" hidden><span id="rfotoinfo" class="hintsmall"></span></div>
     <img id="rprev" alt="Foto do registro" hidden style="max-width:100%;border-radius:10px">
     <div class="row"><button type="button" class="btn primary" id="rsave">Salvar registro</button></div></div>`;
+  const RM=mappedAt(sel.x,sel.y);
+  { const PL=PESSOA&&PESSOA.local,perto=PL&&PL.lat!=null&&ptD(sel.x,sel.y,[PL.lon,PL.lat])<=3;
+    const sug=[...RM.hits.map(h=>h.nome),...(PESSOA&&PESSOA.comunidade?[PESSOA.comunidade]:[]),...RM.near.map(h=>h.nome)].filter((v,i,a)=>v&&a.indexOf(v)===i);
+    $("rlocs").innerHTML=sug.map(n=>`<option value="${esc(n)}">`).join("");
+    $("rlocal").value=perto&&PESSOA.comunidade?PESSOA.comunidade:(RM.hits[0]?RM.hits[0].nome:"");
+    $("rmun").value=lastA&&lastA.mun||(perto&&PESSOA.municipio)||"";
+    $("rlocinfo").innerHTML=RM.hits.length?`O ponto fica dentro de território mapeado: <b>${esc(RM.hits.map(h=>h.nome+" ("+h.tipo+")").join("; "))}</b>.`
+      :`O ponto fica fora dos territórios mapeados${RM.near[0]?` (mais próximo: ${esc(RM.near[0].nome)}, a ${fmtKm(RM.near[0].km)})`:""}. Escreva o nome da comunidade ou localidade.`; }
   $("rfoto").addEventListener("change",async e=>{const fl=e.target.files[0];e.target.value="";if(!fl)return;$("rfotoinfo").textContent="Preparando a foto…";
     try{regFoto=await shrinkPhoto(fl);$("rprev").src=regFoto;$("rprev").hidden=false;$("rfotoinfo").textContent=`Foto pronta (${Math.round(regFoto.length*0.75/1024)} KB).`;}catch(err){regFoto=null;$("rfotoinfo").textContent="Não consegui abrir a foto.";}});
-  $("rsave").onclick=async()=>{const texto=$("rtexto").value.trim();if(!texto){rsay("Escreva uma descrição curta.",true);return;}
+  $("rsave").onclick=async()=>{const texto=$("rtexto").value.trim();
+    const localidade=$("rlocal").value.trim().replace(/\s+/g," ");if(localidade.length<2){rsay("Diga onde você está: o nome da comunidade ou localidade.",true);$("rlocal").focus();return;}
+    const munOk=MUN.find(x=>normTxt(x.name)===normTxt($("rmun").value));if(!munOk){rsay("Escolha o município da lista (municípios da Bahia).",true);$("rmun").focus();return;}
+    if(!texto){rsay("Escreva uma descrição curta.",true);return;}
     const b=$("rsave");b.disabled=true;const id=uid();
-    const rec={id,lat:+sel.y.toFixed(6),lon:+sel.x.toFixed(6),mun:lastA&&lastA.mun||"",tipo:$("rtipo").value,texto,origem:sel.how||"",precisaoM:sel.acc?Math.round(sel.acc):null,temFoto:!!regFoto,criadoEm:new Date().toISOString(),enviado:false};
-    try{await enqueue("registro",{localId:id,lat:rec.lat,lon:rec.lon,municipio:rec.mun,tipo:rec.tipo,texto,carEnvolvido:carCodeNorm($("rcar").value),titularCar:$("rdono").value.trim(),origemPonto:rec.origem,precisaoM:rec.precisaoM,foto:regFoto});
+    const hit=RM.hits.find(h=>normTxt(h.nome)===normTxt(localidade));
+    const locMap={situacao:RM.hits.length?"mapeado":"nova",territorio:hit||RM.hits[0]||null,dentroDe:RM.hits.map(h=>h.nome),proximo:!RM.hits.length&&RM.near[0]?{nome:RM.near[0].nome,km:+RM.near[0].km.toFixed(2)}:null};
+    const rec={id,lat:+sel.y.toFixed(6),lon:+sel.x.toFixed(6),localidade,mun:munOk.name,tipo:$("rtipo").value,texto,origem:sel.how||"",precisaoM:sel.acc?Math.round(sel.acc):null,temFoto:!!regFoto,criadoEm:new Date().toISOString(),enviado:false};
+    try{await enqueue("registro",{localId:id,lat:rec.lat,lon:rec.lon,localidade,municipio:rec.mun,municipioDoPonto:lastA&&lastA.mun||"",localidadeNoMapa:locMap,tipo:rec.tipo,texto,origemPonto:rec.origem,precisaoM:rec.precisaoM,foto:regFoto});
       REGS.unshift(rec);saveLists();rsay(CFG.endpoint?"Registro salvo. Enviando para o banco de dados.":"Registro guardado no celular.");renderRegForm();renderRList();draw();}
     catch(e){rsay(e.message||"Não foi possível salvar.",true);}b.disabled=false;};}
 function renderRList(){const l=$("rlist");if(!REGS.length){l.innerHTML=`<p class="hintsmall">Nenhum registro neste celular ainda.</p>`;return;}
   const rs=REGS.slice(0,30);
-  l.innerHTML=`<div class="label">Registros feitos neste celular</div>`+rs.map(r=>`<div class="titem"><div class="nm"><b>${esc(r.tipo)}</b><span>${esc(r.mun||"")} · ${esc(new Date(r.criadoEm).toLocaleDateString("pt-BR"))}${r.temFoto?" · com foto":""}</span> ${stTag(r)}<span style="display:block;color:var(--ink);font-size:14px">${esc(String(r.texto).slice(0,240))}</span></div>
+  l.innerHTML=`<div class="label">Registros feitos neste celular</div>`+rs.map(r=>`<div class="titem"><div class="nm"><b>${esc(r.tipo)}</b><span>${r.localidade?esc(r.localidade)+" · ":""}${esc(r.mun||"")} · ${esc(new Date(r.criadoEm).toLocaleDateString("pt-BR"))}${r.temFoto?" · com foto":""}</span> ${stTag(r)}<span style="display:block;color:var(--ink);font-size:14px">${esc(String(r.texto).slice(0,240))}</span></div>
     <button type="button" class="btn sm" data-rv="${esc(r.id)}">Ver no mapa</button>${r.enviado?`<button type="button" class="btn sm" data-rd="${esc(r.id)}">Tirar do celular</button>`:""}</div>`).join("");
   l.querySelectorAll("[data-rv]").forEach(b=>b.onclick=()=>{const r=REGS.find(x=>x.id===b.dataset.rv);centerOn(r.lon,r.lat,0.08);choose(r.lon,r.lat,"registro",true);$("map").scrollIntoView({behavior:"smooth",block:"start"});});
   l.querySelectorAll("[data-rd]").forEach(b=>b.onclick=()=>delBtn(b,()=>{REGS=REGS.filter(x=>x.id!==b.dataset.rd);saveLists();renderRList();draw();rsay("Tirado da lista do celular. A cópia enviada continua no banco de dados.");}));}
@@ -1060,7 +1153,9 @@ async function sendReport(blob,fname,dados){
   catch(e){return "Não foi possível guardar o relatório para envio ("+(e.message||"erro")+").";}}
 async function initDB(){renderWho();renderTList();renderRegForm();renderRList();renderCfg();updSync();sync();
   $("offbtn").onclick=cacheAll;const off=lsGet("ot_offline");if(off)$("offmsg").textContent="Mapa guardado no celular em "+new Date(off).toLocaleDateString("pt-BR")+".";
-  if(!PESSOA)showGate(false);}
+  if(!PESSOA)showGate(false);
+  else if(PESSOA.local===undefined){focoLocal=true;showGate(false);}
+  else draw();}
 
 /* ---------- MapBiomas Coleção 11: série histórica 1985–2025 ---------- */
 const MBC={"3": ["Formação Florestal", "1f8d49", "nat"], "6": ["Floresta Alagável", "007785", "nat"], "4": ["Formação Savânica", "7dc975", "nat"], "7": ["Savana Alagada (beta)", "228c70", "nat"], "5": ["Mangue", "04381d", "nat"], "49": ["Restinga Arbórea", "02d659", "nat"], "12": ["Formação Campestre", "d6bc74", "nat"], "77": ["Formação Herbáceo Arbustiva (beta)", "86b074", "nat"], "11": ["Campo Alagado e Área Pantanosa", "519799", "nat"], "84": ["Marisma (beta)", "81dbbf", "nat"], "50": ["Restinga Herbácea ou Arbustiva", "ffaa5f", "nat"], "32": ["Apicum", "fc8114", "nat"], "29": ["Afloramento Rochoso", "ad5100", "nat"], "15": ["Pastagem", "edde8e", "agr"], "39": ["Soja", "f5b3c8", "agr"], "20": ["Cana", "db7093", "agr"], "40": ["Arroz", "c71585", "agr"], "62": ["Algodão (beta)", "ff69b4", "agr"], "41": ["Outras Lavouras Temporárias", "f54ca9", "agr"], "46": ["Café", "d68fe2", "agr"], "47": ["Citrus", "9932cc", "agr"], "35": ["Dendê", "9065d0", "agr"], "48": ["Outras Lavouras Perenes", "e6ccff", "agr"], "9": ["Silvicultura", "7a5900", "agr"], "21": ["Mosaico de Usos", "ffefc3", "agr"], "23": ["Praia, Duna e Areal", "ffa07a", "nv"], "24": ["Área Urbanizada", "d4271e", "nv"], "30": ["Mineração", "9c0027", "nv"], "75": ["Usina Fotovoltaica", "757272", "nv"], "91": ["Parque eólico (beta)", "403d3e", "nv"], "25": ["Outras Áreas não Vegetadas", "db4d4f", "nv"], "33": ["Rio, Lago e Oceano", "2532e4", "agua"], "31": ["Aquicultura", "091077", "agua"]};

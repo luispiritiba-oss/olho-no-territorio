@@ -130,7 +130,7 @@ footer.note{margin-top:18px;font-size:13px;color:var(--mute);max-width:80ch}
 .sync span{flex:1 1 200px}
 .sync.ok{background:var(--ok-soft);color:var(--ok)}.sync.warn{background:var(--warn-soft);color:var(--warn)}.sync.err{background:var(--alert-soft);color:var(--alert)}
 .gate{max-width:560px}
-.gate .tform input:not([type=checkbox]){width:100%}
+.gate .tform input:not([type=checkbox]):not([type=radio]){width:100%}
 .consent{background:var(--paper);border-radius:12px;padding:10px 12px;font-size:14px;display:flex;flex-direction:column;gap:8px}
 .consent p{margin:0}
 .tform .chk{display:flex}
@@ -247,6 +247,22 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .bchart .ct{fill:var(--mute);font-size:12px;font-family:var(--f-body)}
 .bchart .cg{stroke:var(--line);stroke-width:1}
 .prog{font-size:13px;color:var(--mute)}
+/* localização da comunidade (1.9) */
+fieldset.comloc{border:2px solid var(--accent);border-radius:14px;padding:12px;margin:4px 0;display:flex;flex-direction:column;gap:10px;min-width:0}
+fieldset.comloc legend{font-family:var(--f-display);font-weight:800;font-size:18px;padding:0 6px;color:var(--accent)}
+fieldset.comloc .btn{width:100%}fieldset.comloc .row .btn{width:auto}
+fieldset.comloc .search{position:relative}
+.locres{display:flex;flex-direction:column;gap:6px;border-radius:12px;padding:10px 12px;font-size:14px}
+.locres>b{font-size:15px}
+.locres.in{background:var(--ok-soft);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.locres.new{background:#fdebe1;color:#9a3412;border:1px solid #f4b48f}
+.locres .chk{color:var(--ink);font-weight:400}.locres .chk small{display:block;color:var(--mute);font-size:12.5px}
+.locpill{display:inline-block;margin-top:4px;font-size:13px;font-weight:700;border-radius:99px;padding:2px 10px}
+.locpill.in{background:var(--ok-soft);color:var(--ok)}.locpill.new{background:#fdebe1;color:#9a3412}.locpill.sem{background:var(--warn-soft);color:var(--warn)}
+.who .nm .locpill{display:inline-block;font-size:13px}.who .nm .locpill.in{color:var(--ok)}.who .nm .locpill.new{color:#9a3412}.who .nm .locpill.sem{color:var(--warn)}.who .nm .locpill span{color:inherit}
+.tform .chk input[type=radio]{flex:none}
+.who .nm .locpill{display:table}
+.lnk{font:inherit;font-weight:700;color:inherit;text-decoration:underline;background:none;border:0;padding:0;cursor:pointer;min-height:0}
 </style>
 
 </head>
@@ -379,8 +395,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="config.js?v=183"></script>
-<script src="app.js?v=183"></script>
+<script src="config.js?v=191"></script>
+<script src="app.js?v=191"></script>
 <script>
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
 let deferredInstall=null;const ib=document.getElementById("install");
