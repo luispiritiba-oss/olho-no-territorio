@@ -104,8 +104,7 @@ tr.nova td{background:color-mix(in srgb,#fdebe1 55%,transparent)}
     </div>
     <div class="kpis" id="kpis"></div>
     <div class="grid">
-      <section class="card wide hl" id="scom"><h2>Comunidades no mapa</h2><p class="note">Onde cada pessoa disse que fica a sua comunidade, no início do uso do aplicativo. Comunidades fora dos territórios já mapeados (FUNAI, INCRA, ICMBio/INEMA, CEFIR coletivo e territórios inseridos no app) aparecem como <b>novas comunidades a mapear</b>.</p><div id="ccom"></div></section>
-      <section class="card wide hl"><h2>Ameaças por comunidade</h2><p class="note">Registros de campo pela comunidade ou localidade que a pessoa informou em "Onde estou?", com o município e o tipo de ameaça. As descrições escritas ficam só na planilha.</p><div id="came"></div></section>
+      <section class="card wide hl" id="scom"><h2>Comunidades, municípios e ameaças</h2><p class="note">Pelos registros de campo: a comunidade ou localidade que a pessoa escreveu em "Onde estou?", o município e a ameaça vista. Quando o ponto fica fora dos territórios já mapeados (FUNAI, INCRA, ICMBio/INEMA, CEFIR coletivo e territórios inseridos no app), a comunidade aparece como <b>nova comunidade a mapear</b>. As descrições escritas ficam só na planilha.</p><div id="ccom"></div></section>
       <section class="card wide"><h2>Envios por mês</h2><p class="note" id="nmes"></p>
         <div class="legend"><span><i style="background:var(--s1)"></i>Registros de campo</span><span><i style="background:var(--s2)"></i>Territórios analisados</span><span><i style="background:var(--s3)"></i>Relatórios gerados</span></div>
         <div id="cmes"></div></section>
@@ -116,8 +115,7 @@ tr.nova td{background:color-mix(in srgb,#fdebe1 55%,transparent)}
         <div id="cmapa"></div></section>
       <section class="card wide"><h2>Territórios analisados</h2><p class="note">Sobreposições encontradas no território de cada comunidade.</p><div class="scroll" id="tterr"></div></section>
       <section class="card wide"><h2>Conflito e ameaça territorial</h2><p class="note">Classificação dos territórios e registros comunitários de conflito ou de ameaça feitos por quem usa o aplicativo. A tabela compara o que as bases públicas indicavam com o que a comunidade registrou, para ajustar os critérios na fase de monitoramento. As descrições escritas ficam só na aba "Calibracao" da planilha.</p><div id="ccal"></div></section>
-      <section class="card"><h2>Comunidades participantes</h2><p class="note">Pela comunidade informada no cadastro de quem enviou.</p><div class="scroll" id="tcom"></div></section>
-      <section class="card"><h2>Relatórios gerados</h2><p class="note">Os PDFs ficam na pasta "relatorios" do Drive (acesso restrito à equipe).</p><div class="scroll" id="trel"></div></section>
+      <section class="card wide"><h2>Relatórios gerados</h2><p class="note">Os PDFs ficam na pasta "relatorios" do Drive (acesso restrito à equipe).</p><div class="scroll" id="trel"></div></section>
     </div>
     <p class="foot" id="foot"></p>
   </main>
@@ -166,14 +164,14 @@ function render(){hideTip();const y=$("ano").value,mun=$("fmun").value;const py=
   const R=filt(D.registros,y,mun),T=filt(D.territorios,y,mun),L=filt(D.relatorios,y,mun),C=filt(D.consultas,y,mun),P=filt(D.pessoas,y,mun);
   const pv=py?{R:filt(D.registros,py,mun).length,T:filt(D.territorios,py,mun).length,L:filt(D.relatorios,py,mun).length,P:filt(D.pessoas,py,mun).length}:{};
   const muns=new Set();[...R,...T,...L].forEach(o=>String(o.mun||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(m=>muns.add(m)));
-  const coms=new Set([...R,...T,...L].map(o=>o.com).filter(Boolean));
+  const CM=comFilt(y,mun);const coms=CM?new Set(CM.map(o=>o.k)):new Set([...R,...T,...L].map(o=>o.com).filter(Boolean));
   const K=[["Registros de campo",R.length,pv.R],["Territórios analisados",T.length,pv.T],["Relatórios gerados",L.length,pv.L],["Pessoas cadastradas no ano",P.length,pv.P],["Municípios com atividade",muns.size,null],["Comunidades com envios",coms.size,null]];
   $("kpis").innerHTML=K.map(([l,v,p])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${fmt(v)}</div>${py&&p!=null?delta(v,p):""}</div>`).join("");
   monthChart(R,T,L,y);
   hbars($("ctipo"),count(R.map(o=>o.tipo||"Sem tipo")),"var(--s1)","registro(s)");
   const mc={};[...R,...T,...L].forEach(o=>String(o.mun||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(m=>mc[m]=(mc[m]||0)+1));hbars($("cmun"),Object.entries(mc).sort((a,b)=>b[1]-a[1]).slice(0,12),"var(--s1)","envio(s)");
-  const CM=comFilt(y,mun);comSec(CM,y);ameSec(y,mun);
-  mapa(R,L,C,CM);terrTable(T);comTable(R,T,L,CM);relTable(L);calib(filt(D.calibracao||[],y,mun),T);}
+  comSec(CM,y);
+  mapa(R,L,C,CM);terrTable(T);relTable(L);calib(filt(D.calibracao||[],y,mun),T);}
 function calib(K,T){const el=$("ccal");let h="";
   const tl=T.map(t=>lvl(t.idx)).filter(v=>v!=null);
   if(tl.length){h+=`<p style="margin:4px 0 6px;font-weight:600">Classificação dos territórios analisados no período</p><div class="hb">`+[0,1,2].map(k=>{const n=tl.filter(v=>v===k).length,mx=Math.max(1,tl.length);return `<div class="r"><span class="l">${NIV[k]}</span><div class="t"><div class="f" style="width:${n/mx*100}%;background:${NIVC[k]}"></div></div><span class="v">${n}</span></div>`;}).join("")+`</div>`;}
@@ -189,32 +187,30 @@ function calib(K,T){const el=$("ccal");let h="";
 const SITN={mapeado:"Em território mapeado",nova:"Nova comunidade a mapear",sem:"Sem localização"};
 const sitB=k=>`<span class="sit ${k}">${SITN[k]||"–"}</span>`;
 const nrm=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
-function comFilt(y,mun){if(!Array.isArray(D.comunidades))return null;return D.comunidades.filter(o=>(y==="todos"||!o.d||yr(o.d)<=+y)&&(!mun||o.mun===mun));}
+function comFilt(y,mun){if(!Array.isArray(D.ameacas))return null;const A=filt(D.ameacas,y,mun),g={};
+  A.forEach(o=>{const k=nrm(o.local)+"|"+nrm(o.mun);const r=g[k]||(g[k]={k,com:o.local,mun:o.mun,n:0,t:{},d:null,last:null,sit:"nova",terr:"",tipo:"",fonte:"",lat:null,lon:null,prox:"",proxKm:null});
+    r.n++;r.t[o.tipo||"Outro"]=(r.t[o.tipo||"Outro"]||0)+1;if(!r.d||String(o.d)<r.d)r.d=o.d;if(!r.last||String(o.d)>r.last)r.last=o.d;
+    if(o.sit==="mapeado"&&r.sit!=="mapeado"){r.sit="mapeado";r.terr=o.terr;r.tipo=o.terrTipo||"";r.fonte=o.fonte||"";r.lat=o.lat;r.lon=o.lon;}
+    if(r.lat==null&&o.lat!=null){r.lat=o.lat;r.lon=o.lon;}if(!r.prox&&o.prox){r.prox=o.prox;r.proxKm=o.proxKm;}});
+  const out=Object.values(g);out.nReg=A.length;return out;}
 function comSec(CM,y){const el=$("ccom");
-  if(!CM){el.innerHTML=`<p class="empty">O script do Google ainda não envia a localização das comunidades. Cole o arquivo <b>apps-script/comunidades.gs</b> no script e publique uma nova versão (as instruções estão no começo do arquivo).</p>`;return;}
-  const N=CM.filter(o=>o.sit==="nova"),M=CM.filter(o=>o.sit==="mapeado"),S=CM.filter(o=>o.sit==="sem");
+  if(!CM){el.innerHTML=`<p class="empty">O script do Google ainda não envia as comunidades dos registros de campo. Cole o arquivo <b>apps-script/comunidades.gs</b> no script e publique uma nova versão (as instruções estão no começo do arquivo).</p>`;return;}
+  if(!CM.length){el.innerHTML=`<p class="empty">Nenhum registro de campo com comunidade informada neste período.</p>`;return;}
+  const N=CM.filter(o=>o.sit==="nova"),M=CM.filter(o=>o.sit==="mapeado");
   const novasAno=y!=="todos"?N.filter(o=>o.d&&yr(o.d)===+y).length:null;
-  let h=`<div class="kpis" style="margin:6px 0 12px"><div class="kpi nova"><div class="l">Novas comunidades a mapear</div><div class="v">${fmt(N.length)}</div>${novasAno!=null?`<div class="d">${fmt(novasAno)} informada(s) em ${y}</div>`:""}</div>
-    <div class="kpi map"><div class="l">Em território mapeado</div><div class="v">${fmt(M.length)}</div></div>
-    <div class="kpi"><div class="l">Sem localização informada</div><div class="v">${fmt(S.length)}</div></div>
-    <div class="kpi"><div class="l">Comunidades informadas</div><div class="v">${fmt(CM.length)}</div></div></div>`;
   const ll=o=>o.lat!=null?`<a href="https://www.google.com/maps?q=${o.lat},${o.lon}" target="_blank" rel="noopener">${(+o.lat).toFixed(5)}, ${(+o.lon).toFixed(5)}</a>`:"–";
-  const dt=o=>o.d?new Date(o.d).toLocaleDateString("pt-BR"):"–";
-  h+=`<h3 style="margin:4px 0 6px;font-size:16px">Novas comunidades a mapear (${N.length})</h3>`+(N.length?`<div class="scroll"><table class="tbl"><thead><tr><th>Comunidade</th><th>Município</th><th>Ponto informado</th><th>Território mapeado mais próximo</th><th>Pessoas</th><th>Desde</th></tr></thead><tbody>`+
-    N.slice().sort((a,b)=>String(b.d).localeCompare(String(a.d))).map(o=>`<tr class="nova"><td><b>${esc(o.com)}</b></td><td>${esc(o.mun)}</td><td>${ll(o)}</td><td>${o.prox?`${esc(o.prox)}${o.proxKm!=null?` · ${String(o.proxKm).replace(".",",")} km`:""}`:"nenhum a menos de 5 km"}</td><td class="n">${o.pessoas||1}</td><td>${dt(o)}</td></tr>`).join("")+`</tbody></table></div>`:`<p class="empty">Nenhuma neste período.</p>`);
-  h+=`<h3 style="margin:14px 0 6px;font-size:16px">Comunidades em território mapeado (${M.length})</h3>`+(M.length?`<div class="scroll"><table class="tbl"><thead><tr><th>Comunidade</th><th>Município</th><th>Território mapeado</th><th>Tipo · fonte</th><th>Ponto</th><th>Pessoas</th></tr></thead><tbody>`+
-    M.slice().sort((a,b)=>String(a.com).localeCompare(String(b.com),"pt")).map(o=>`<tr><td><b>${esc(o.com)}</b></td><td>${esc(o.mun)}</td><td>${esc(o.terr)}</td><td>${esc([o.tipo,o.fonte].filter(Boolean).join(" · "))}</td><td>${ll(o)}</td><td class="n">${o.pessoas||1}</td></tr>`).join("")+`</tbody></table></div>`:`<p class="empty">Nenhuma neste período.</p>`);
-  if(S.length)h+=`<p class="note" style="margin-top:10px">Sem localização: ${S.map(o=>esc(o.com)+(o.mun?" ("+esc(o.mun)+")":"")).join(", ")}. A pessoa pode indicar depois, no aplicativo, em "indicar agora".</p>`;
+  const dt=d=>d?new Date(d).toLocaleDateString("pt-BR"):"–";
+  const chips=o=>`<div class="tchips">${Object.entries(o.t).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${esc(k)} <b>${v}</b></span>`).join("")}</div>`;
+  const ord=(a,b)=>b.n-a.n||String(b.last).localeCompare(String(a.last));
+  let h=`<div class="kpis" style="margin:6px 0 12px"><div class="kpi nova"><div class="l">Novas comunidades a mapear</div><div class="v">${fmt(N.length)}</div>${novasAno!=null?`<div class="d">${fmt(novasAno)} com primeiro registro em ${y}</div>`:""}</div>
+    <div class="kpi map"><div class="l">Em território mapeado</div><div class="v">${fmt(M.length)}</div></div>
+    <div class="kpi"><div class="l">Comunidades ou localidades</div><div class="v">${fmt(CM.length)}</div></div>
+    <div class="kpi"><div class="l">Registros de ameaça</div><div class="v">${fmt(CM.nReg)}</div></div></div>`;
+  h+=`<h3 style="margin:4px 0 6px;font-size:16px">Novas comunidades a mapear (${N.length})</h3>`+(N.length?`<div class="scroll"><table class="tbl" style="min-width:760px"><thead><tr><th>Comunidade ou localidade</th><th>Município</th><th>Ameaças registradas</th><th>Ponto</th><th>Território mapeado mais próximo</th><th>Último</th></tr></thead><tbody>`+
+    N.sort(ord).map(o=>`<tr class="nova"><td><b>${esc(o.com)}</b></td><td>${esc(o.mun)}</td><td>${chips(o)}</td><td>${ll(o)}</td><td>${o.prox?`${esc(o.prox)}${o.proxKm!=null?` · ${String(o.proxKm).replace(".",",")} km`:""}`:"nenhum a menos de 5 km"}</td><td>${dt(o.last)}</td></tr>`).join("")+`</tbody></table></div>`:`<p class="empty">Nenhuma neste período.</p>`);
+  h+=`<h3 style="margin:14px 0 6px;font-size:16px">Comunidades em território mapeado (${M.length})</h3>`+(M.length?`<div class="scroll"><table class="tbl" style="min-width:760px"><thead><tr><th>Comunidade ou localidade</th><th>Município</th><th>Ameaças registradas</th><th>Território mapeado</th><th>Ponto</th><th>Último</th></tr></thead><tbody>`+
+    M.sort(ord).map(o=>`<tr><td><b>${esc(o.com)}</b></td><td>${esc(o.mun)}</td><td>${chips(o)}</td><td>${esc(o.terr)}${o.tipo||o.fonte?`<br><span style="font-size:12px;color:var(--mute)">${esc([o.tipo,o.fonte].filter(Boolean).join(" · "))}</span>`:""}</td><td>${ll(o)}</td><td>${dt(o.last)}</td></tr>`).join("")+`</tbody></table></div>`:`<p class="empty">Nenhuma neste período.</p>`);
   el.innerHTML=h;}
-function ameSec(y,mun){const el=$("came");
-  if(!Array.isArray(D.ameacas)){el.innerHTML=`<p class="empty">O script do Google ainda não envia as ameaças por comunidade. Cole o arquivo <b>apps-script/comunidades.gs</b> no script e publique uma nova versão.</p>`;return;}
-  const A=filt(D.ameacas,y,mun);if(!A.length){el.innerHTML=`<p class="empty">Nenhum registro de campo com comunidade informada neste período.</p>`;return;}
-  const g={};A.forEach(o=>{const k=nrm(o.local)+"|"+nrm(o.mun);const r=g[k]||(g[k]={local:o.local,mun:o.mun,n:0,t:{},last:null,sit:"nova",terr:""});r.n++;r.t[o.tipo||"Outro"]=(r.t[o.tipo||"Outro"]||0)+1;if(!r.last||String(o.d)>r.last)r.last=o.d;if(o.sit==="mapeado"){r.sit="mapeado";r.terr=r.terr||o.terr;}});
-  const rows=Object.values(g).sort((a,b)=>b.n-a.n||String(b.last).localeCompare(String(a.last)));
-  const nf=rows.filter(r=>r.sit!=="mapeado").length;
-  el.innerHTML=`<div class="kpis" style="margin:6px 0 12px"><div class="kpi"><div class="l">Comunidades ou localidades com registro</div><div class="v">${fmt(rows.length)}</div></div><div class="kpi nova"><div class="l">Fora de território mapeado</div><div class="v">${fmt(nf)}</div></div><div class="kpi"><div class="l">Registros de ameaça</div><div class="v">${fmt(A.length)}</div></div></div>
-  <div class="scroll"><table class="tbl" style="min-width:680px"><thead><tr><th>Comunidade ou localidade</th><th>Município</th><th>Ameaças registradas</th><th>Total</th><th>Último</th></tr></thead><tbody>`+
-  rows.map(r=>`<tr${r.sit!=="mapeado"?' class="nova"':""}><td><b>${esc(r.local)}</b><br>${r.sit==="mapeado"?`<span class="sit mapeado">Em ${esc(r.terr||"território mapeado")}</span>`:`<span class="sit nova">Fora de território mapeado</span>`}</td><td>${esc(r.mun)}</td><td><div class="tchips">${Object.entries(r.t).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${esc(k)} <b>${v}</b></span>`).join("")}</div></td><td class="n">${r.n}</td><td>${r.last?new Date(r.last).toLocaleDateString("pt-BR"):"–"}</td></tr>`).join("")+`</tbody></table></div>`;}
 function count(a){const m={};a.forEach(k=>m[k]=(m[k]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]);}
 function hbars(el,rows,color,unit){if(!rows.length){el.innerHTML=`<p class="empty">Nada neste período.</p>`;return;}const mx=Math.max(...rows.map(r=>r[1]));
   el.innerHTML=rows.map(([k,v])=>`<div class="r" title="${esc(k)}: ${v} ${unit}"><span>${esc(k)}</span><div class="t"><div class="f" style="width:${v/mx*100}%;background:${color}"></div></div><span class="n">${fmt(v)}</span></div>`).join("");}
@@ -252,12 +248,9 @@ const pc=v=>v==null?"–":(v<1&&v>0?"<1":Math.round(v))+"%";
 function terrTable(T){const el=$("tterr");if(!T.length){el.innerHTML=`<p class="empty">Nenhum território analisado neste período.</p>`;return;}
   el.innerHTML=`<table class="tbl"><thead><tr><th>Data</th><th>Território</th><th>Tipo</th><th>Município(s)</th><th>Área (ha)</th><th>CAR individual</th><th>Processos minerários</th><th>Área com mineração</th><th>Eólicas sobre</th><th>Classificação</th><th>Limite</th></tr></thead><tbody>`+
   T.slice().sort((a,b)=>String(b.d).localeCompare(String(a.d))).map(t=>`<tr><td>${new Date(t.d).toLocaleDateString("pt-BR")}</td><td><b>${esc(t.nome)}</b>${t.cod?`<br><span style="font-size:12px;color:var(--mute)">${esc(t.cod)}</span>`:""}</td><td>${esc(t.tipo)}</td><td>${esc(t.mun)}</td><td class="n">${t.area!=null?fmt(Math.round(t.area)):"–"}</td><td class="n">${pc(t.carPct)}</td><td class="n">${t.nMin??"–"}</td><td class="n">${pc(t.minPct)}</td><td>${esc(t.eol)||"–"}</td><td>${badge(t.idx)}</td><td>${t.geo?`<a href="${esc(t.geo)}" target="_blank" rel="noopener">GeoJSON</a>`:"–"}</td></tr>`).join("")+`</tbody></table>`;}
-function comTable(R,T,L,CM){const el=$("tcom");const sitOf=c=>{if(!CM)return null;const o=CM.find(x=>nrm(x.com)===nrm(c));return o?o.sit:null;};const m={};const add=(o,k)=>{const c=o.com||"Não informada";m[c]=m[c]||{r:0,t:0,l:0,mun:new Set()};m[c][k]++;if(o.mun)String(o.mun).split(",").forEach(x=>x.trim()&&m[c].mun.add(x.trim()));};
-  R.forEach(o=>add(o,"r"));T.forEach(o=>add(o,"t"));L.forEach(o=>add(o,"l"));const rows=Object.entries(m).sort((a,b)=>(b[1].r+b[1].t+b[1].l)-(a[1].r+a[1].t+a[1].l));
-  el.innerHTML=rows.length?`<table class="tbl"><thead><tr><th>Comunidade</th><th>Município(s)</th><th>Registros</th><th>Territórios</th><th>Relatórios</th></tr></thead><tbody>`+rows.map(([c,v])=>{const st=sitOf(c);return `<tr${st==="nova"?' class="nova"':""}><td>${esc(c)}${st?`<br>${sitB(st)}`:""}</td><td>${esc([...v.mun].join(", "))}</td><td class="n">${v.r}</td><td class="n">${v.t}</td><td class="n">${v.l}</td></tr>`;}).join("")+`</tbody></table>`:`<p class="empty">Nada neste período.</p>`;}
 function relTable(L){const el=$("trel");el.innerHTML=L.length?`<table class="tbl"><thead><tr><th>Data</th><th>Tipo</th><th>Local</th><th>Município</th><th>PDF</th></tr></thead><tbody>`+L.slice().sort((a,b)=>String(b.d).localeCompare(String(a.d))).map(r=>`<tr><td>${new Date(r.d).toLocaleDateString("pt-BR")}</td><td>${esc(r.tipo)}</td><td>${esc(r.local)}</td><td>${esc(r.mun)}</td><td>${r.pdf?`<a href="${esc(r.pdf)}" target="_blank" rel="noopener">abrir</a>`:"–"}</td></tr>`).join("")+`</tbody></table>`:`<p class="empty">Nenhum relatório neste período.</p>`;}
 $("csv").onclick=()=>{const y=$("ano").value,mun=$("fmun").value;const R=filt(D.registros,y,mun),T=filt(D.territorios,y,mun),L=filt(D.relatorios,y,mun),P=filt(D.pessoas,y,mun);
-  const lines=[["indicador","valor"],["ano",y],["município",mun||"todos"],["registros de campo",R.length],["territórios analisados",T.length],["relatórios gerados",L.length],["pessoas cadastradas",P.length],[],["tipo de registro","quantidade"],...count(R.map(o=>o.tipo||"Sem tipo")),[],["território","tipo","municípios","área (ha)","% CAR individual","processos minerários","% com mineração","classificação"],...T.map(t=>[t.nome,t.tipo,t.mun,t.area,t.carPct,t.nMin,t.minPct,t.idx||""]),[],["comunidade","município","situação no mapa","território mapeado","latitude","longitude","pessoas"],...(comFilt(y,mun)||[]).map(o=>[o.com,o.mun,SITN[o.sit]||"",o.terr||"",o.lat??"",o.lon??"",o.pessoas||1]),[],["comunidade ou localidade do registro","município","ameaça","data","situação no mapa"],...filt(D.ameacas||[],y,mun).map(o=>[o.local,o.mun,o.tipo,o.d?new Date(o.d).toLocaleDateString("pt-BR"):"",o.sit==="mapeado"?"em "+(o.terr||"território mapeado"):"fora de território mapeado"])];
+  const lines=[["indicador","valor"],["ano",y],["município",mun||"todos"],["registros de campo",R.length],["territórios analisados",T.length],["relatórios gerados",L.length],["pessoas cadastradas",P.length],[],["tipo de registro","quantidade"],...count(R.map(o=>o.tipo||"Sem tipo")),[],["território","tipo","municípios","área (ha)","% CAR individual","processos minerários","% com mineração","classificação"],...T.map(t=>[t.nome,t.tipo,t.mun,t.area,t.carPct,t.nMin,t.minPct,t.idx||""]),[],["comunidade ou localidade","município","situação no mapa","território mapeado","ameaças","registros","latitude","longitude"],...(comFilt(y,mun)||[]).map(o=>[o.com,o.mun,o.sit==="mapeado"?"em território mapeado":"nova comunidade a mapear",o.terr||"",Object.entries(o.t).map(([k,v])=>k+" ("+v+")").join(", "),o.n,o.lat??"",o.lon??""])];
   const txt="﻿"+lines.map(r=>r.map(v=>{const s=String(v??"");return /[;"\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}).join(";")).join("\n");
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download=`painel-olho-no-territorio_${y}.csv`;document.body.appendChild(a);a.click();a.remove();};
 loadUF();
